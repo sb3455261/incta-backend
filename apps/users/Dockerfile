@@ -12,7 +12,8 @@ RUN mkdir -p $NPM_CONFIG_CACHE && \
 USER node
 WORKDIR /home/node/dist/${SERVICE}
 COPY --chown=node package*.json ./
-RUN npm ci --only=production && \
+RUN mkdir -p node_modules && \
+    npm ci --only=production && \
     npm cache clean --force && \
     rm -rf $NPM_CONFIG_CACHE
 COPY --chown=node . .
