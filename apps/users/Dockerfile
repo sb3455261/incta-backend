@@ -20,4 +20,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
 USER node
 EXPOSE ${PORT}
-CMD ["sh", "-c", "npm run start:users"]
+CMD ["npm", "run", "start:users"]
