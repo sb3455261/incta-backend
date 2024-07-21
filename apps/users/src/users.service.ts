@@ -12,7 +12,11 @@ export class UsersService {
 
   async getHello(): Promise<string> {
     try {
-      return `Hello World 1! is running on port ${this.appConfig.USERS_MICROSERVICE_PORT} && findAllUsersReturns ${JSON.stringify(await this.repository.findAll())}`;
+      return `<div>
+        <div>Hello World 1! is running on port ${this.appConfig.USERS_MICROSERVICE_PORT}</div>
+        <div>&& USERS_DATABASE_URL is set to: ${this.appConfig.USERS_DATABASE_URL.slice(0, 30)}</div>
+        <div>&& findAllUsersReturns ${JSON.stringify(await this.repository.findAll())}</div>
+    <div>`;
     } catch (error) {
       console.error(error.message);
       throw new BadGatewayException();

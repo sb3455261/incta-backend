@@ -14,10 +14,12 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
   const usersValues = {
     APP_API_PREFIX: process.env.APP_API_PREFIX,
     USERS_MICROSERVICE_PORT: +process.env.USERS_MICROSERVICE_PORT,
+    USERS_DATABASE_URL: process.env.USERS_DATABASE_URL,
   };
   const { error } = Joi.object({
     APP_API_PREFIX: Joi.string().required(),
     USERS_MICROSERVICE_PORT: Joi.number().required(),
+    USERS_DATABASE_URL: Joi.string().required(),
   }).validate({ ...usersValues }, { abortEarly: false });
   if (error) {
     try {
