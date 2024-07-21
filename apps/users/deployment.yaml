@@ -21,19 +21,3 @@ spec:
            ports:
              - containerPort: PORT_CONTAINER
 
-           env:
-             - name: USERS_MICROSERVICE_PORT
-               valueFrom:
-                 secretKeyRef:
-                   name: incta-backend-users-production-config-secret
-                   key: USERS_MICROSERVICE_PORT
-             - name: APP_API_PREFIX
-               valueFrom:
-                 secretKeyRef:
-                   name: incta-backend-users-production-config-secret
-                   key: APP_API_PREFIX
-             - name: USERS_DATABASE_URL
-               valueFrom:
-                 secretKeyRef:
-                   name: incta-backend-users-production-config-secret
-                   key: USERS_DATABASE_URL
