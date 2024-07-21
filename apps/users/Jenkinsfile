@@ -3,7 +3,7 @@ pipeline {
     agent any
     environment {
         ENV_TYPE = "production"
-        PORT = 3447
+        PORT = 3454
         NAMESPACE = "incta-team"
         REGISTRY_HOSTNAME = "sbbs8668"
         PROJECT = "incta-backend-users"
