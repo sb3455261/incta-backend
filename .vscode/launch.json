@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Debug Users microservice",
+            "type": "node",
+            "request": "launch",
+            "args": [
+              "src/main.ts"
+            ],
+            "runtimeArgs": [
+              "-r",
+              "ts-node/register",
+              "-r",
+              "tsconfig-paths/register"
+            ],
+            "cwd": "${workspaceRoot}/apps/users",
+            "internalConsoleOptions": "openOnSessionStart",
+            "sourceMaps": true,
+            "console": "internalConsole",
+            "outputCapture": "std"
+          }
+    ]
+    
+}
