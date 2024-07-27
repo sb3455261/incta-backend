@@ -7,7 +7,6 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@app/shared(.*)$": "<rootDir>/../../../libs/shared/src$1",
-      "^@users-generated$": "<rootDir>/users-prisma.mock.ts"
+      "^@app/shared(.*)$": "<rootDir>/../../../libs/shared/src$1"
     }
 }
