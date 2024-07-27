@@ -1,27 +1,44 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
+import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
+
 describe('UsersController', () => {
-  // let usersController: UsersController;
+  let usersController: UsersController;
+  let usersService: UsersService;
 
   beforeEach(async () => {
-    /* const app: TestingModule = await Test.createTestingModule({
-      imports: [AppConfigModule, PrismaModule],
+    const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
-        UsersService,
-        PrismaService,
         {
-          provide: UserRepository,
-          useClass: PrismaUserRepository,
+          provide: UsersService,
+          useValue: {
+            getHello: jest.fn(),
+          },
+        },
+        {
+          provide: createMockAppConfig,
+          useFactory: () => ({
+            ...createMockAppConfig(),
+          }),
         },
       ],
     }).compile();
 
-    usersController = app.get<UsersController>(UsersController); */
+    usersController = module.get<UsersController>(UsersController);
+    usersService = module.get<UsersService>(UsersService);
   });
 
-  describe('root', () => {
-    it('should return "Hello World 1!"', async () => {
-      expect(true).toBe(true);
-      // expect(await usersController.getHello()).toContain('Hello World 1!');
+  describe('getHello', () => {
+    it('should return the result from UsersService.getHello', async () => {
+      const expectedResult = 'Hello World!';
+      jest.spyOn(usersService, 'getHello').mockResolvedValue(expectedResult);
+
+      const result = await usersController.getHello();
+
+      expect(result).toBe(expectedResult);
+      expect(usersService.getHello).toHaveBeenCalled();
     });
   });
 });
