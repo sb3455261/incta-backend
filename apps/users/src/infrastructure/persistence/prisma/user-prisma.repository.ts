@@ -6,6 +6,7 @@ import {
   EProviderFields,
   EUserFields,
   EUsersProviderFields,
+  IUser,
   IUsersProvider,
 } from '@app/shared';
 import { UserRepository } from '../../../application/ports/user-abstract.repository';
@@ -17,106 +18,67 @@ export class PrismaUserRepository extends UserRepository {
     super();
   }
 
-  async findAll(): Promise<User[]> {
+  async findUsersProvider(
+    where: Partial<IUsersProvider>,
+  ): Promise<IUsersProvider | null> {
+    return this.prisma.usersProvider.findFirst({
+      where,
+    });
+  }
+
+  async findAll(): Promise<IUser[]> {
     return this.prisma.user.findMany({
       include: { [EUserFields.providers]: true },
     });
   }
 
-  async #create(user: User, newUsersProvider: IUsersProvider) {
+  async create(user: User): Promise<Omit<IUser, EUserFields.providers>> {
     const newUser = await this.prisma.user.create({
       data: {
         [EDbEntityFields.id]: user[EDbEntityFields.id],
         [EUserFields.providers]: {
-          create: [newUsersProvider as Required<IUsersProvider>],
+          create: [user.providers[0] as Required<IUsersProvider>],
         },
       },
     });
     return { [EDbEntityFields.id]: newUser[EDbEntityFields.id] };
   }
 
-  async create(user: User): Promise<Omit<User, EUserFields.providers>> {
-    const provider = await this.prisma.provider.findFirstOrThrow({
-      where: {
-        [EProviderFields.name]:
-          user.providers[0][EUsersProviderFields.providerName],
+  async createProvider(
+    userId: string,
+    providerData: Omit<IUsersProvider, EDbEntityFields.id>,
+  ): Promise<void> {
+    await this.prisma.usersProvider.create({
+      data: {
+        userLocalId: userId,
+        providerLocalId: providerData[EUsersProviderFields.providerLocalId],
+        sub: providerData[EUsersProviderFields.sub],
+        email: providerData[EUsersProviderFields.email],
+        login: providerData[EUsersProviderFields.login],
+        name: providerData[EUsersProviderFields.name],
+        surname: providerData[EUsersProviderFields.surname],
+        password: providerData[EUsersProviderFields.password],
+        avatar: providerData[EUsersProviderFields.avatar],
+        emailIsValidated: providerData[EUsersProviderFields.emailIsValidated],
       },
     });
-    const newUsersProvider = user.providers[0];
-    newUsersProvider[EUsersProviderFields.providerName] = undefined;
-    newUsersProvider[EUsersProviderFields.providerLocalId] =
-      provider[EDbEntityFields.id];
+  }
 
-    if (provider[EProviderFields.name] === EProvider.local) {
-      return this.#create(user, newUsersProvider);
-    }
+  async update(id: string, data: Partial<IUsersProvider>): Promise<void> {
+    await this.prisma.usersProvider.update({
+      where: { [EDbEntityFields.id]: id },
+      data,
+    });
+  }
 
-    const existingWithEmailUsersProvider =
-      await this.prisma.usersProvider.findFirst({
-        where: {
-          [EUsersProviderFields.email]:
-            newUsersProvider[EUsersProviderFields.email],
-          [EUsersProviderFields.providerLocalId]: provider[EDbEntityFields.id],
-        },
-      });
-    if (existingWithEmailUsersProvider) {
-      await this.prisma.usersProvider.update({
-        where: {
-          [EDbEntityFields.id]:
-            existingWithEmailUsersProvider[EDbEntityFields.id],
-        },
-        data: {
-          [EUsersProviderFields.name]:
-            newUsersProvider[EUsersProviderFields.name],
-          [EUsersProviderFields.surname]:
-            newUsersProvider[EUsersProviderFields.surname],
-          [EUsersProviderFields.password]:
-            newUsersProvider[EUsersProviderFields.password],
-          [EUsersProviderFields.avatar]:
-            newUsersProvider[EUsersProviderFields.avatar],
-        },
-      });
-      return {
-        [EDbEntityFields.id]:
-          existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
-      };
-    }
-
-    const existingWithProviderIdUsersProvider =
-      await this.prisma.usersProvider.findFirst({
-        where: {
-          [EUsersProviderFields.sub]:
-            newUsersProvider[EUsersProviderFields.sub],
-          [EUsersProviderFields.providerLocalId]: provider[EDbEntityFields.id],
-        },
-      });
-    if (existingWithProviderIdUsersProvider) {
-      await this.prisma.usersProvider.update({
-        where: {
-          [EDbEntityFields.id]:
-            existingWithProviderIdUsersProvider[EDbEntityFields.id],
-        },
-        data: {
-          [EUsersProviderFields.email]:
-            newUsersProvider[EUsersProviderFields.email],
-          [EUsersProviderFields.login]:
-            newUsersProvider[EUsersProviderFields.login],
-          [EUsersProviderFields.name]:
-            newUsersProvider[EUsersProviderFields.name],
-          [EUsersProviderFields.surname]:
-            newUsersProvider[EUsersProviderFields.surname],
-          [EUsersProviderFields.password]:
-            newUsersProvider[EUsersProviderFields.password],
-          [EUsersProviderFields.avatar]:
-            newUsersProvider[EUsersProviderFields.avatar],
-        },
-      });
-      return {
-        [EDbEntityFields.id]:
-          existingWithProviderIdUsersProvider[EUsersProviderFields.userLocalId],
-      };
-    }
-
-    return this.#create(user, newUsersProvider);
+  async findProvider(
+    providerName: EProvider,
+  ): Promise<{ [EDbEntityFields.id]: string }> {
+    return this.prisma.provider.findFirstOrThrow({
+      where: {
+        [EProviderFields.name]: providerName,
+      },
+      select: { [EDbEntityFields.id]: true },
+    });
   }
 }

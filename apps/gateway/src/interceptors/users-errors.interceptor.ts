@@ -20,7 +20,7 @@ export class UsersErrorInterceptor implements NestInterceptor {
         }
         if (error.name === 'PrismaClientKnownRequestError') {
           return throwError(
-            () => new HttpException('Entity exists.', HttpStatus.CONFLICT),
+            () => new HttpException('Entity exists', HttpStatus.CONFLICT),
           );
         }
 
