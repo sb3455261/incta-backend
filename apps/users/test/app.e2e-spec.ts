@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { Transport, ClientProxy, ClientsModule } from '@nestjs/microservices';
-import { lastValueFrom } from 'rxjs';
-import { EUsersRoutes, EProvider, EUsersProviderFields } from '@app/shared';
-import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
-import { mockPrismaService } from './users-prisma.mock';
+import { lastValueFrom, timeout, catchError } from 'rxjs';
+import {
+  EUsersRoutes,
+  EProvider,
+  EUsersProviderFields,
+  appConfig,
+} from '@app/shared';
 import { UsersModule } from '../src/application/users.module';
 import { PrismaService } from '../src/infrastructure/persistence/prisma/prisma.service';
 import { UserRepository } from '../src/application/ports/user-abstract.repository';
@@ -13,7 +16,7 @@ import { EUserInfrastuctureDriver } from '../src/infrastructure/persistence/user
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
   let client: ClientProxy;
-  const mockAppConfig = createMockAppConfig();
+  const config = appConfig();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -21,18 +24,29 @@ describe('UsersController (e2e)', () => {
         UsersModule.register(EUserInfrastuctureDriver.prisma),
         ClientsModule.register([
           {
-            name: mockAppConfig.USERS_MICROSERVICE_NAME,
+            name: config.USERS_MICROSERVICE_NAME,
             transport: Transport.TCP,
             options: {
               host: '0.0.0.0',
-              port: mockAppConfig.USERS_MICROSERVICE_PORT,
+              port: config.USERS_MICROSERVICE_PORT,
             },
           },
         ]),
       ],
     })
       .overrideProvider(PrismaService)
-      .useValue(mockPrismaService)
+      .useValue({
+        user: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { id: '1', email: 'test@example.com', name: 'Test User' },
+            ]),
+          create: jest.fn().mockResolvedValue({ id: '2' }),
+        },
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
       .overrideProvider(UserRepository)
       .useValue({
         findAll: jest
@@ -41,6 +55,8 @@ describe('UsersController (e2e)', () => {
             { id: '1', email: 'test@example.com', name: 'Test User' },
           ]),
         create: jest.fn().mockResolvedValue({ id: '2' }),
+        findUsersProvider: jest.fn().mockResolvedValue(null),
+        findProvider: jest.fn().mockResolvedValue({ id: 'providerId' }),
       })
       .compile();
 
@@ -49,26 +65,15 @@ describe('UsersController (e2e)', () => {
       transport: Transport.TCP,
       options: {
         host: '0.0.0.0',
-        port: mockAppConfig.USERS_MICROSERVICE_PORT,
+        port: config.USERS_MICROSERVICE_PORT,
       },
     });
 
     await app.startAllMicroservices();
     await app.init();
 
-    client = moduleFixture.get<ClientProxy>(
-      mockAppConfig.USERS_MICROSERVICE_NAME,
-    );
+    client = moduleFixture.get<ClientProxy>(config.USERS_MICROSERVICE_NAME);
     await client.connect();
-  });
-
-  afterAll(async () => {
-    if (client) {
-      await client.close();
-    }
-    if (app) {
-      await app.close();
-    }
   });
 
   afterAll(async () => {
@@ -78,7 +83,13 @@ describe('UsersController (e2e)', () => {
 
   it('should return all users', async () => {
     const result = await lastValueFrom(
-      client.send({ cmd: EUsersRoutes.findAllUsers }, {}),
+      client.send({ cmd: EUsersRoutes.findAllUsers }, {}).pipe(
+        timeout(5000),
+        catchError((error) => {
+          console.error('Error in findAllUsers:', error);
+          throw error;
+        }),
+      ),
     );
 
     expect(result).toEqual([
@@ -98,10 +109,15 @@ describe('UsersController (e2e)', () => {
       [EUsersProviderFields.emailIsValidated]: false,
     };
 
-    const result = await lastValueFrom(
-      client.send({ cmd: EUsersRoutes.createUser }, userProviderData),
-    );
-
-    expect(result).toEqual({ id: '2' });
+      const result = await lastValueFrom(
+        client.send({ cmd: EUsersRoutes.createUser }, userProviderData).pipe(
+          timeout(5000),
+          catchError((error) => {
+            console.error('Error in createUser observable:', error);
+            throw error;
+          }),
+        ),
+      );
+      expect(result).toEqual({ id: '2' });
   });
 });

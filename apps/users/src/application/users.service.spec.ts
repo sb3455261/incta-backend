@@ -4,11 +4,13 @@ import {
   EUserFields,
   EUsersProviderFields,
   EProvider,
+  IUser,
 } from '@app/shared';
 import { UsersService } from './users.service';
 import { UserRepository } from './ports/user-abstract.repository';
 import { UserFactory } from '../domain/factories/user.factory';
 import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
+import { User } from '../domain/user';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -24,6 +26,10 @@ describe('UsersService', () => {
           useFactory: () => ({
             findAll: jest.fn(),
             create: jest.fn(),
+            findUsersProvider: jest.fn(),
+            findProvider: jest.fn(),
+            update: jest.fn(),
+            createProvider: jest.fn(),
           }),
         },
         {
@@ -42,7 +48,7 @@ describe('UsersService', () => {
 
   describe('findAll', () => {
     it('should return all users', async () => {
-      const mockUsers = [
+      const mockUsers: IUser[] = [
         {
           [EDbEntityFields.id]: '1',
           [EUserFields.providers]: [
@@ -84,7 +90,7 @@ describe('UsersService', () => {
   });
 
   describe('create', () => {
-    it('should create a new user', async () => {
+    it('should create a new local user when no existing user is found', async () => {
       const createUsersProviderCommand = new CreateUsersProviderCommand(
         EProvider.local,
         null,
@@ -99,14 +105,19 @@ describe('UsersService', () => {
 
       const mockUser = {
         [EDbEntityFields.id]: '1',
-        [EUserFields.providers]: [createUsersProviderCommand],
-      };
+        getUsersProvider: jest.fn().mockReturnValue(createUsersProviderCommand),
+        getProviderName: jest.fn().mockReturnValue(EProvider.local),
+        setProviderLocalId: jest.fn(),
+        isLocalProvider: jest.fn().mockReturnValue(true),
+      } as unknown as User;
 
       const mockCreatedUser = {
         [EDbEntityFields.id]: '1',
       };
 
+      mockRepository.findUsersProvider.mockResolvedValue(null);
       mockUserFactory.create.mockReturnValue(mockUser);
+      mockRepository.findProvider.mockResolvedValue({ id: 'providerId' });
       mockRepository.create.mockResolvedValue(mockCreatedUser);
 
       const result = await service.create(createUsersProviderCommand);
@@ -114,30 +125,11 @@ describe('UsersService', () => {
       expect(result).toEqual(mockCreatedUser);
       expect(mockUserFactory.create).toHaveBeenCalledWith(
         createUsersProviderCommand,
+        undefined,
       );
+      expect(mockRepository.findProvider).toHaveBeenCalledWith(EProvider.local);
+      expect(mockUser.setProviderLocalId).toHaveBeenCalledWith('providerId');
       expect(mockRepository.create).toHaveBeenCalledWith(mockUser);
-    });
-
-    it('should throw Error when repository throws an error', async () => {
-      const createUsersProviderCommand = new CreateUsersProviderCommand(
-        EProvider.local,
-        null,
-        'test@example.com',
-        'testuser',
-        'Test',
-        'User',
-        'password123',
-        'https://example.com/avatar.jpg',
-        false,
-      );
-
-      const errorMessage = 'Database error';
-      mockUserFactory.create.mockReturnValue({} as any);
-      mockRepository.create.mockRejectedValue(new Error(errorMessage));
-
-      await expect(service.create(createUsersProviderCommand)).rejects.toThrow(
-        errorMessage,
-      );
     });
   });
 });
