@@ -1,3 +1,4 @@
 export enum EUsersRoutes {
-  getusers = 'get-users',
+  findAllUsers = 'find-all-users',
+  createUser = 'create-user',
 }

@@ -10,6 +10,34 @@ datasource db {
 
 model User {
   id String @id @default(uuid())
-  email String @unique
+  providers UsersProvider[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Provider {
+  id String @id @default(uuid())
+  name String @unique
+  usersProvider UsersProvider[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model UsersProvider {
+  id String @id @default(uuid())
+  userLocalId String
+  user User @relation(fields: [userLocalId], references: [id])
+  providerLocalId String
+  provider Provider @relation(fields: [providerLocalId], references: [id])
+  sub String? @unique
+  email String
+  login String
   name String?
+  surname String?
+  password String
+  avatar String?
+  emailIsValidated Boolean
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  @@unique([providerLocalId, email], name: "providerEmailConstraint")
 }

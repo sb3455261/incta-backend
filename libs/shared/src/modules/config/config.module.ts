@@ -18,15 +18,29 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     USERS_MICROSERVICE_HOST: process.env.USERS_MICROSERVICE_HOST,
     USERS_MICROSERVICE_PORT: +process.env.USERS_MICROSERVICE_PORT,
     USERS_DATABASE_URL: process.env.USERS_DATABASE_URL,
+    USERNAME_MIN_LENGHT: +process.env.USERNAME_MIN_LENGHT,
+    USERNAME_MAX_LENGHT: +process.env.USERNAME_MAX_LENGHT,
+    USERNAME_ALLOWED_SYMBOLS: process.env.USERNAME_ALLOWED_SYMBOLS,
+    USERPASSWORD_MIN_LENGHT: +process.env.USERPASSWORD_MIN_LENGHT,
+    USERPASSWORD_MAX_LENGHT: +process.env.USERPASSWORD_MAX_LENGHT,
+    USERPASSWORD_ALLOWED_SYMBOLS: process.env.USERPASSWORD_ALLOWED_SYMBOLS,
   };
 
   const schema = Joi.object({
     APP_API_PREFIX: Joi.string(),
+
     GATEWAY_MICROSERVICE_PORT: Joi.number(),
+
     USERS_MICROSERVICE_NAME: Joi.string(),
     USERS_MICROSERVICE_HOST: Joi.string(),
     USERS_MICROSERVICE_PORT: Joi.number(),
     USERS_DATABASE_URL: Joi.string(),
+    USERNAME_MIN_LENGHT: Joi.number(),
+    USERNAME_MAX_LENGHT: Joi.number(),
+    USERNAME_ALLOWED_SYMBOLS: Joi.string(),
+    USERPASSWORD_MIN_LENGHT: Joi.number(),
+    USERPASSWORD_MAX_LENGHT: Joi.number(),
+    USERPASSWORD_ALLOWED_SYMBOLS: Joi.string(),
   });
 
   const { error } = schema.validate(configValues, { abortEarly: false });
