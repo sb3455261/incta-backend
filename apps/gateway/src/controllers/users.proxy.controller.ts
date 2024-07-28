@@ -1,8 +1,22 @@
-import { appConfig, EGatewayRoutes, EUsersRoutes } from '@app/shared';
-import { Controller, Get, Inject } from '@nestjs/common';
+import {
+  appConfig,
+  EGatewayRoutes,
+  EUsersRoutes,
+  UsersProviderDto,
+} from '@app/shared';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { UsersErrorInterceptor } from '../interceptors/users-errors.interceptor';
 
 @Controller()
+@UseInterceptors(UsersErrorInterceptor)
 export class UsersProxyController {
   constructor(
     @Inject(appConfig().USERS_MICROSERVICE_NAME)
@@ -10,7 +24,15 @@ export class UsersProxyController {
   ) {}
 
   @Get(EGatewayRoutes.users)
-  async getUsers() {
-    return this.usersClient.send({ cmd: EUsersRoutes.getusers }, {});
+  async findAllUsers() {
+    return this.usersClient.send({ cmd: EUsersRoutes.findAllUsers }, {});
+  }
+
+  @Post(EGatewayRoutes.users)
+  async createUser(@Body() userProviderData: UsersProviderDto) {
+    return this.usersClient.send(
+      { cmd: EUsersRoutes.createUser },
+      userProviderData,
+    );
   }
 }

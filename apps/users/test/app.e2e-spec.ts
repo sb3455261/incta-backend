@@ -1,31 +1,31 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { Transport, ClientsModule, ClientProxy } from '@nestjs/microservices';
+import { Transport, ClientProxy, ClientsModule } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
-import { EUsersRoutes , appConfig as originalAppConfig } from '@app/shared';
-import { mockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
-import { UsersModule } from '../src/users.module';
-import { UserRepository } from '../src/repositories/user-repository/user-abstract.repository';
+import { EUsersRoutes, EProvider, EUsersProviderFields } from '@app/shared';
+import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
 import { mockPrismaService } from './users-prisma.mock';
-import { PrismaService } from '../src/repositories/prisma-repository/prisma.service';
-
-const mockAppConfigFn = jest.fn(() => mockAppConfig);
+import { UsersModule } from '../src/application/users.module';
+import { PrismaService } from '../src/infrastructure/persistence/prisma/prisma.service';
+import { UserRepository } from '../src/application/ports/user-abstract.repository';
+import { EUserInfrastuctureDriver } from '../src/infrastructure/persistence/users-infrastructure.module';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
   let client: ClientProxy;
+  const mockAppConfig = createMockAppConfig();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        UsersModule,
+        UsersModule.register(EUserInfrastuctureDriver.prisma),
         ClientsModule.register([
           {
-            name: mockAppConfigFn().USERS_MICROSERVICE_NAME,
+            name: mockAppConfig.USERS_MICROSERVICE_NAME,
             transport: Transport.TCP,
             options: {
               host: '0.0.0.0',
-              port: mockAppConfigFn().USERS_MICROSERVICE_PORT,
+              port: mockAppConfig.USERS_MICROSERVICE_PORT,
             },
           },
         ]),
@@ -40,10 +40,7 @@ describe('UsersController (e2e)', () => {
           .mockResolvedValue([
             { id: '1', email: 'test@example.com', name: 'Test User' },
           ]),
-      })
-      .overrideProvider(originalAppConfig.KEY)
-      .useFactory({
-        factory: () => mockAppConfigFn(),
+        create: jest.fn().mockResolvedValue({ id: '2' }),
       })
       .compile();
 
@@ -52,7 +49,7 @@ describe('UsersController (e2e)', () => {
       transport: Transport.TCP,
       options: {
         host: '0.0.0.0',
-        port: mockAppConfigFn().USERS_MICROSERVICE_PORT,
+        port: mockAppConfig.USERS_MICROSERVICE_PORT,
       },
     });
 
@@ -60,9 +57,18 @@ describe('UsersController (e2e)', () => {
     await app.init();
 
     client = moduleFixture.get<ClientProxy>(
-      mockAppConfigFn().USERS_MICROSERVICE_NAME,
+      mockAppConfig.USERS_MICROSERVICE_NAME,
     );
     await client.connect();
+  });
+
+  afterAll(async () => {
+    if (client) {
+      await client.close();
+    }
+    if (app) {
+      await app.close();
+    }
   });
 
   afterAll(async () => {
@@ -70,23 +76,32 @@ describe('UsersController (e2e)', () => {
     await app.close();
   });
 
-  it('should return users (TCP)', async () => {
+  it('should return all users', async () => {
     const result = await lastValueFrom(
-      client.send({ cmd: EUsersRoutes.getusers }, {}),
-    ).catch((error) => {
-      console.error('Error in test:', error);
-      throw error;
-    });
+      client.send({ cmd: EUsersRoutes.findAllUsers }, {}),
+    );
 
-    expect(result).toContain('Hello World 1!');
-    expect(result).toContain(
-      `is running on port ${mockAppConfigFn().USERS_MICROSERVICE_PORT}`,
+    expect(result).toEqual([
+      { id: '1', email: 'test@example.com', name: 'Test User' },
+    ]);
+  });
+
+  it('should create a new user', async () => {
+    const userProviderData = {
+      [EUsersProviderFields.providerName]: EProvider.local,
+      [EUsersProviderFields.email]: 'new@example.com',
+      [EUsersProviderFields.login]: 'newuser',
+      [EUsersProviderFields.name]: 'New',
+      [EUsersProviderFields.surname]: 'User',
+      [EUsersProviderFields.password]: 'Password123!',
+      [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
+      [EUsersProviderFields.emailIsValidated]: false,
+    };
+
+    const result = await lastValueFrom(
+      client.send({ cmd: EUsersRoutes.createUser }, userProviderData),
     );
-    expect(result).toContain('USERS_DATABASE_URL is set to:');
-    expect(result).toContain(
-      JSON.stringify([
-        { id: '1', email: 'test@example.com', name: 'Test User' },
-      ]),
-    );
+
+    expect(result).toEqual({ id: '2' });
   });
 });
