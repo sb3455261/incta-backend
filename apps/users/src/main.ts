@@ -1,12 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { appConfig as _appConfig } from '@app/shared';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { UsersModule } from './users.module';
+import { UsersModule } from './application/users.module';
+import { UsersDataValidationPipe } from './application/pipes/users-data-validation.pipe';
+import { EUserInfrastuctureDriver } from './infrastructure/persistence/users-infrastructure.module';
 
 (async function () {
   const appConfig = _appConfig();
   const usersApp = await NestFactory.createMicroservice<MicroserviceOptions>(
-    UsersModule,
+    UsersModule.register(EUserInfrastuctureDriver.prisma),
     {
       transport: Transport.TCP,
       options: {
@@ -15,6 +17,7 @@ import { UsersModule } from './users.module';
       },
     },
   );
+  usersApp.useGlobalPipes(UsersDataValidationPipe);
   await usersApp.listen().then(() => {
     console.debug(
       `
