@@ -25,9 +25,10 @@ export class UsersProviderDto {
       _this[EUsersProviderFields.providerName] === EProvider.github ||
       _this[EUsersProviderFields.providerName] === EProvider.google,
   )
+  @IsNotEmpty()
   @IsString()
   @MaxLength(200)
-  public readonly [EUsersProviderFields.sub]?: string;
+  public readonly [EUsersProviderFields.sub]: string;
 
   @IsEmail()
   public readonly [EUsersProviderFields.email]: string;

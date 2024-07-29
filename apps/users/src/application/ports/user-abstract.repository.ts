@@ -13,7 +13,7 @@ export abstract class UserRepository {
   ): Promise<IUsersProvider | null>;
   abstract findAll(): Promise<IUser[]>;
   abstract create(userData: User): Promise<Omit<IUser, EUserFields.providers>>;
-  abstract createProvider(
+  abstract createUsersProvider(
     userId: string,
     providerData: Omit<IUsersProvider, EDbEntityFields.id>,
   ): Promise<void>;
