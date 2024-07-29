@@ -1,26 +1,81 @@
 {
     "version": "0.2.0",
     "configurations": [
-        
-        {
-            "name": "Debug Users microservice",
-            "type": "node",
-            "request": "launch",
-            "args": [
-              "src/main.ts"
-            ],
-            "runtimeArgs": [
-              "-r",
-              "ts-node/register",
-              "-r",
-              "tsconfig-paths/register"
-            ],
-            "cwd": "${workspaceRoot}/apps/users",
-            "internalConsoleOptions": "openOnSessionStart",
-            "sourceMaps": true,
-            "console": "internalConsole",
-            "outputCapture": "std"
-          }
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug All Microservices",
+        "runtimeExecutable": "bash",
+        "runtimeArgs": [
+          "-c",
+          "source ${workspaceFolder}/set-env-dev.sh && npm run dev"
+        ],
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "outFiles": [
+          "${workspaceFolder}/dist/**/*.js"
+        ],
+        "sourceMaps": true,
+        "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ],
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/.env",
+        "cwd": "${workspaceFolder}",
+        "restart": true
+      },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug Gateway",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": [
+          "run",
+          "dev:gateway"
+        ],
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "outFiles": [
+          "${workspaceFolder}/dist/**/*.js"
+        ],
+        "sourceMaps": true,
+        "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ],
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/.env",
+        "cwd": "${workspaceFolder}",
+        "restart": true
+      },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug Users",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": [
+          "run",
+          "dev:users"
+        ],
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "outFiles": [
+          "${workspaceFolder}/dist/**/*.js"
+        ],
+        "sourceMaps": true,
+        "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ],
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/.env",
+        "cwd": "${workspaceFolder}",
+        "restart": true,
+        "preLaunchTask": "npm: prisma:generate:users"
+      }
     ]
-    
-}
+  }

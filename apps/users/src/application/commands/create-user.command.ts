@@ -1,8 +1,5 @@
-import { EDbEntityFields } from '@app/shared';
-import { randomUUID } from 'crypto';
+import { User } from '../../domain/user';
 
 export class CreateUserCommand {
-  constructor() {
-    this[EDbEntityFields.id] = randomUUID();
-  }
+  constructor(public readonly user: User) {}
 }

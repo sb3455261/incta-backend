@@ -109,15 +109,15 @@ describe('UsersController (e2e)', () => {
       [EUsersProviderFields.emailIsValidated]: false,
     };
 
-      const result = await lastValueFrom(
-        client.send({ cmd: EUsersRoutes.createUser }, userProviderData).pipe(
-          timeout(5000),
-          catchError((error) => {
-            console.error('Error in createUser observable:', error);
-            throw error;
-          }),
-        ),
-      );
-      expect(result).toEqual({ id: '2' });
+    const result = await lastValueFrom(
+      client.send({ cmd: EUsersRoutes.createUser }, userProviderData).pipe(
+        timeout(5000),
+        catchError((error) => {
+          console.error('Error in createUser observable:', error);
+          throw error;
+        }),
+      ),
+    );
+    expect(result).toEqual({ id: '2' });
   });
 });

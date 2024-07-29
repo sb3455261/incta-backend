@@ -44,7 +44,7 @@ export class PrismaUserRepository extends UserRepository {
     return { [EDbEntityFields.id]: newUser[EDbEntityFields.id] };
   }
 
-  async createProvider(
+  async createUsersProvider(
     userId: string,
     providerData: Omit<IUsersProvider, EDbEntityFields.id>,
   ): Promise<void> {

@@ -1,21 +1,41 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { AppConfigModule } from '@app/shared';
 import { UsersService } from './users.service';
 import { UsersController } from '../presenters/tcp/users.controller';
-import { UserFactory } from '../domain/factories/user.factory';
 import {
   EUserInfrastuctureDriver,
   UserInfrastructureModule,
 } from '../infrastructure/persistence/users-infrastructure.module';
+import { UserFactory } from '../domain/factories/user.factory';
+import { UsersProviderFactory } from '../domain/factories/users-provider.factory';
+import { CreateUsersProviderCommandHandler } from './commands/create-users-provider.command.handler';
+import { GetAllUsersQueryHandler } from './queries/get-all-users.query.handler';
+import { CreateUserCommandHandler } from './commands/create-user.command.handler';
+import { FindUsersProviderQueryHandler } from './queries/find-users-provider.query.handler';
+import { FindProviderQueryHandler } from './queries/find-provider.query.handler';
 
 @Module({})
 export class UsersModule {
   static register(driver: EUserInfrastuctureDriver): DynamicModule {
     return {
       module: UsersModule,
-      imports: [AppConfigModule, UserInfrastructureModule.use(driver)],
+      imports: [
+        CqrsModule.forRoot(),
+        AppConfigModule,
+        UserInfrastructureModule.use(driver),
+      ],
       controllers: [UsersController],
-      providers: [UsersService, UserFactory],
+      providers: [
+        UsersService,
+        UserFactory,
+        UsersProviderFactory,
+        CreateUsersProviderCommandHandler,
+        GetAllUsersQueryHandler,
+        CreateUserCommandHandler,
+        FindUsersProviderQueryHandler,
+        FindProviderQueryHandler,
+      ],
     };
   }
 }

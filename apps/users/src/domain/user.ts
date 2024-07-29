@@ -20,23 +20,23 @@ export class User implements IUser {
   }
 
   static create(
-    providerData: Omit<
+    id: string,
+    providerName: EProvider,
+    usersProvider: Omit<
       IUsersProvider,
       | EDbEntityFields.id
       | EUsersProviderFields.userLocalId
       | EUsersProviderFields.providerLocalId
     >,
-    providerName: EProvider,
-    id: string,
   ): User {
     const userId = id || randomUUID();
     const providerId = randomUUID();
     const provider: IUsersProvider = {
-      ...providerData,
+      ...usersProvider,
       [EUsersProviderFields.sub]:
         providerName === EProvider.local
           ? userId
-          : providerData[EUsersProviderFields.sub],
+          : usersProvider[EUsersProviderFields.sub],
       id: providerId,
     };
 
