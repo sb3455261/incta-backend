@@ -21,4 +21,5 @@ export abstract class UserRepository {
   abstract findProvider(
     providerName: EProvider,
   ): Promise<{ [EDbEntityFields.id]: string }>;
+  abstract delete(userId: string): Promise<void>;
 }

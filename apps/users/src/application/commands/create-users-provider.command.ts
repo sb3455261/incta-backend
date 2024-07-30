@@ -1,6 +1,8 @@
 import { EDbEntityFields, EProvider, EUsersProviderFields } from '@app/shared';
 import { randomUUID } from 'crypto';
 
+const nonLocalProviderLoginDevider = ':';
+
 export class CreateUsersProviderCommand {
   public readonly [EDbEntityFields.id]: string;
 
@@ -31,7 +33,9 @@ export class CreateUsersProviderCommand {
     this[EDbEntityFields.id] = randomUUID();
     this[EUsersProviderFields.password] = password || randomUUID();
     this[EUsersProviderFields.login] =
-      providerName !== EProvider.local ? email : login;
+      providerName !== EProvider.local
+        ? `${email}${nonLocalProviderLoginDevider}${providerName}`
+        : login;
     this[EUsersProviderFields.name] = name;
     this[EUsersProviderFields.surname] = surname;
     this[EUsersProviderFields.avatar] = avatar;
