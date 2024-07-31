@@ -18,12 +18,15 @@ export class UsersErrorInterceptor implements NestInterceptor {
             () => new HttpException(error.message, HttpStatus.BAD_REQUEST),
           );
         }
-        if (error.name === 'PrismaClientKnownRequestError') {
+        if (
+          error.name === 'PrismaClientKnownRequestError' &&
+          error.code === 'P2002'
+        ) {
           return throwError(
             () => new HttpException('Entity exists', HttpStatus.CONFLICT),
           );
         }
-
+        console.error(error);
         return throwError(
           () =>
             new HttpException(

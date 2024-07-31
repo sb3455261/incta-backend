@@ -9,6 +9,7 @@ import {
   IUser,
   IUsersProvider,
 } from '@app/shared';
+import { Prisma } from '@users-generated';
 import { UserRepository } from '../../../application/ports/user-abstract.repository';
 import { PrismaService } from './prisma.service';
 
@@ -21,22 +22,35 @@ export class PrismaUserRepository extends UserRepository {
   async findUsersProvider(
     where: Partial<IUsersProvider>,
   ): Promise<IUsersProvider | null> {
-    return this.prisma.usersProvider.findFirst({
-      where: {
-        AND: [
-          { ...where },
-          {
-            OR: [
-              { provider: { name: EProvider.local } },
-              { provider: { name: { not: { equals: '' } } } },
-            ],
-          },
-        ],
-      },
-      include: {
-        provider: true,
-      },
-    });
+    const whereEntries = Object.entries(where);
+    const whereClause = whereEntries.length
+      ? Prisma.sql`WHERE ${Prisma.join(
+          whereEntries.map(
+            ([key, value]) =>
+              Prisma.sql`up.${Prisma.raw(`"${key}"`)} = ${value}`,
+          ),
+          ' AND ',
+        )}`
+      : Prisma.empty;
+
+    const query = Prisma.sql`
+      SELECT 
+        up.*,
+        json_build_object(
+          'id', p.id,
+          'name', p.name,
+          'createdAt', p."createdAt",
+          'updatedAt', p."updatedAt"
+        ) as provider
+      FROM "UsersProvider" up
+      JOIN "Provider" p ON up."providerLocalId" = p.id
+      ${whereClause}
+      ORDER BY CASE WHEN p.name = ${EProvider.local} THEN 0 ELSE 1 END
+      LIMIT 1
+    `;
+    const result = await this.prisma.$queryRaw<IUsersProvider[]>(query);
+
+    return result[0] || null;
   }
 
   async findAll(): Promise<IUser[]> {
