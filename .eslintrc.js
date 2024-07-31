@@ -32,5 +32,7 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     "@typescript-eslint/naming-convention": "off",
+    "@typescript-eslint/default-param-last": "off",
+    "@typescript-eslint/no-unused-vars": "off"
   },
 };

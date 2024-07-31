@@ -86,8 +86,11 @@ describe('UsersController', () => {
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
         [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.sub]: 'SUB',
         [EUsersProviderFields.surname]: 'User',
         [EUsersProviderFields.password]: 'password123',
+        [EUsersProviderFields.repeatPassword]: 'Password123!',
+        [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
       };
@@ -110,7 +113,10 @@ describe('UsersController', () => {
         [EUsersProviderFields.login]: 'testuser',
         [EUsersProviderFields.name]: 'Test',
         [EUsersProviderFields.surname]: 'User',
+        [EUsersProviderFields.sub]: 'SUB',
         [EUsersProviderFields.password]: 'password123',
+        [EUsersProviderFields.repeatPassword]: 'Password123!',
+        [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
       };

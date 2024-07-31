@@ -30,11 +30,14 @@ export enum EUsersProviderFields {
   password = 'password',
   avatar = 'avatar',
   emailIsValidated = 'emailIsValidated',
+  repeatPassword = 'repeatPassword',
+  agreement = 'agreement',
+  provider = 'provider',
 }
 export interface IUsersProvider extends IDbEntity {
   [EUsersProviderFields.userLocalId]?: IUser['id'];
   [EUsersProviderFields.providerLocalId]?: IProvider['id'];
-  [EUsersProviderFields.sub]?: string;
+  [EUsersProviderFields.sub]: string;
   [EUsersProviderFields.email]: string;
   [EUsersProviderFields.login]: string;
   [EUsersProviderFields.name]?: string;

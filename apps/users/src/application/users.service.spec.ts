@@ -5,32 +5,34 @@ import {
   EUsersProviderFields,
   EProvider,
   IUser,
+  appConfig,
 } from '@app/shared';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
 import { UsersService } from './users.service';
-import { UserRepository } from './ports/user-abstract.repository';
 import { UserFactory } from '../domain/factories/user.factory';
 import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
 import { User } from '../domain/user';
+import { FindUsersProviderQuery } from './queries/find-users-provider.query';
+import { FindProviderQuery } from './queries/find-provider.query';
+import { CreateUserCommand } from './commands/create-user.command';
+import { GetAllUsersQuery } from './queries/get-all-users.query';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let mockRepository: jest.Mocked<UserRepository>;
   let mockUserFactory: jest.Mocked<UserFactory>;
+  let mockCommandBus: jest.Mocked<CommandBus>;
+  let mockQueryBus: jest.Mocked<QueryBus>;
 
   beforeEach(async () => {
+    const mockConfig = createMockAppConfig();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         {
-          provide: UserRepository,
-          useFactory: () => ({
-            findAll: jest.fn(),
-            create: jest.fn(),
-            findUsersProvider: jest.fn(),
-            findProvider: jest.fn(),
-            update: jest.fn(),
-            createProvider: jest.fn(),
-          }),
+          provide: appConfig.KEY,
+          useValue: mockConfig,
         },
         {
           provide: UserFactory,
@@ -38,12 +40,25 @@ describe('UsersService', () => {
             create: jest.fn(),
           }),
         },
+        {
+          provide: CommandBus,
+          useFactory: () => ({
+            execute: jest.fn(),
+          }),
+        },
+        {
+          provide: QueryBus,
+          useFactory: () => ({
+            execute: jest.fn(),
+          }),
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    mockRepository = module.get(UserRepository) as jest.Mocked<UserRepository>;
     mockUserFactory = module.get(UserFactory) as jest.Mocked<UserFactory>;
+    mockCommandBus = module.get(CommandBus) as jest.Mocked<CommandBus>;
+    mockQueryBus = module.get(QueryBus) as jest.Mocked<QueryBus>;
   });
 
   describe('findAll', () => {
@@ -56,7 +71,7 @@ describe('UsersService', () => {
               [EDbEntityFields.id]: '1',
               [EUsersProviderFields.userLocalId]: '1',
               [EUsersProviderFields.providerLocalId]: '1',
-              [EUsersProviderFields.sub]: null,
+              [EUsersProviderFields.sub]: 'SUB',
               [EUsersProviderFields.email]: 'test@example.com',
               [EUsersProviderFields.login]: 'testuser',
               [EUsersProviderFields.name]: 'Test',
@@ -73,17 +88,19 @@ describe('UsersService', () => {
         },
       ];
 
-      mockRepository.findAll.mockResolvedValue(mockUsers);
+      mockQueryBus.execute.mockResolvedValue(mockUsers);
 
       const result = await service.findAll();
 
       expect(result).toEqual(mockUsers);
-      expect(mockRepository.findAll).toHaveBeenCalled();
+      expect(mockQueryBus.execute).toHaveBeenCalledWith(
+        expect.any(GetAllUsersQuery),
+      );
     });
 
-    it('should throw Error when repository throws an error', async () => {
+    it('should throw Error when query bus throws an error', async () => {
       const errorMessage = 'Database error';
-      mockRepository.findAll.mockRejectedValue(new Error(errorMessage));
+      mockQueryBus.execute.mockRejectedValue(new Error(errorMessage));
 
       await expect(service.findAll()).rejects.toThrow(errorMessage);
     });
@@ -93,7 +110,7 @@ describe('UsersService', () => {
     it('should create a new local user when no existing user is found', async () => {
       const createUsersProviderCommand = new CreateUsersProviderCommand(
         EProvider.local,
-        null,
+        'SUB',
         'test@example.com',
         'testuser',
         'Test',
@@ -115,10 +132,18 @@ describe('UsersService', () => {
         [EDbEntityFields.id]: '1',
       };
 
-      mockRepository.findUsersProvider.mockResolvedValue(null);
+      mockQueryBus.execute.mockImplementation((query) => {
+        if (query instanceof FindUsersProviderQuery) {
+          return Promise.resolve(null);
+        }
+        if (query instanceof FindProviderQuery) {
+          return Promise.resolve({ id: 'providerId' });
+        }
+        return undefined;
+      });
+
       mockUserFactory.create.mockReturnValue(mockUser);
-      mockRepository.findProvider.mockResolvedValue({ id: 'providerId' });
-      mockRepository.create.mockResolvedValue(mockCreatedUser);
+      mockCommandBus.execute.mockResolvedValue(mockCreatedUser);
 
       const result = await service.create(createUsersProviderCommand);
 
@@ -127,9 +152,13 @@ describe('UsersService', () => {
         createUsersProviderCommand,
         undefined,
       );
-      expect(mockRepository.findProvider).toHaveBeenCalledWith(EProvider.local);
+      expect(mockQueryBus.execute).toHaveBeenCalledWith(
+        expect.any(FindProviderQuery),
+      );
       expect(mockUser.setProviderLocalId).toHaveBeenCalledWith('providerId');
-      expect(mockRepository.create).toHaveBeenCalledWith(mockUser);
+      expect(mockCommandBus.execute).toHaveBeenCalledWith(
+        expect.any(CreateUserCommand),
+      );
     });
   });
 });

@@ -64,8 +64,11 @@ describe('UsersProxyController', () => {
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
         [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.sub]: 'SUB',
         [EUsersProviderFields.surname]: 'User',
         [EUsersProviderFields.password]: 'Password123!',
+        [EUsersProviderFields.repeatPassword]: 'Password123!',
+        [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
       };
@@ -90,8 +93,11 @@ describe('UsersProxyController', () => {
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
         [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.sub]: 'SUB',
         [EUsersProviderFields.surname]: 'User',
         [EUsersProviderFields.password]: 'Password123!',
+        [EUsersProviderFields.repeatPassword]: 'Password123!',
+        [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
       };

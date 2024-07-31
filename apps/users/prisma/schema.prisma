@@ -13,6 +13,7 @@ model User {
   providers UsersProvider[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+
 }
 
 model Provider {
@@ -31,7 +32,7 @@ model UsersProvider {
   provider Provider @relation(fields: [providerLocalId], references: [id])
   sub String
   email String
-  login String
+  login String @unique
   name String?
   surname String?
   password String
