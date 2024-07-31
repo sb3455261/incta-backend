@@ -7,6 +7,7 @@ import {
   IUser,
   appConfig as _appConfig,
   TAppConfig,
+  IUsersProvider,
 } from '@app/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
@@ -17,6 +18,7 @@ import { CreateUserCommand } from './commands/create-user.command';
 import { FindUsersProviderQuery } from './queries/find-users-provider.query';
 import { FindProviderQuery } from './queries/find-provider.query';
 import { UpdateUsersProviderCommand } from './commands/update-users-provider.command';
+import { User } from '../domain/user';
 
 @Injectable()
 export class UsersService {
@@ -52,115 +54,189 @@ export class UsersService {
     user.setProviderLocalId(provider.id);
     const newUsersProvider = user.getUsersProvider();
 
+    if (user.isLocalProvider()) {
+      return this.createUserWithUsersLocalProviderOrUpdateUsersLocalProvider(
+        user,
+        newUsersProvider,
+        existingWithEmailUsersProvider,
+      );
+    }
+    return this.createUserWithusersExternalProviderOrUpdateUsersExternalProvider(
+      user,
+      newUsersProvider,
+      existingWithEmailUsersProvider,
+    );
+  }
+
+  private async createUsersProvider(
+    user: User,
+    newUsersProvider: IUsersProvider,
+    existingUsersProvider: IUsersProvider,
+  ): Promise<Omit<IUser, EUserFields.providers>> {
+    const createUsersProviderCommand = new CreateUsersProviderCommand(
+      user.getProviderName(),
+      newUsersProvider[EUsersProviderFields.sub],
+      existingUsersProvider[EUsersProviderFields.email],
+      newUsersProvider[EUsersProviderFields.login],
+      newUsersProvider[EUsersProviderFields.name],
+      newUsersProvider[EUsersProviderFields.surname],
+      newUsersProvider[EUsersProviderFields.password],
+      newUsersProvider[EUsersProviderFields.avatar],
+      newUsersProvider[EUsersProviderFields.emailIsValidated],
+      existingUsersProvider[EUsersProviderFields.userLocalId],
+    );
+    await this.commandBus.execute(createUsersProviderCommand);
+    return {
+      [EDbEntityFields.id]:
+        existingUsersProvider[EUsersProviderFields.userLocalId],
+    };
+  }
+
+  private async updateUsersProvider(
+    usersProviderId: string,
+    newUsersProvider: IUsersProvider,
+    fields: EUsersProviderFields[],
+  ): Promise<void> {
+    const updateData = fields.reduce((acc, field) => {
+      acc[field] = newUsersProvider[field];
+      return acc;
+    }, {} as Partial<IUsersProvider>);
+
+    await this.commandBus.execute(
+      new UpdateUsersProviderCommand(usersProviderId, updateData),
+    );
+  }
+
+  private async createUserWithUsersLocalProviderOrUpdateUsersLocalProvider(
+    user: ReturnType<UserFactory['create']>,
+    newUsersProvider: IUsersProvider,
+    existingWithEmailUsersProvider: IUsersProvider,
+  ): Promise<Omit<IUser, EUserFields.providers>> {
     // local
+    // mail does not exist
     // should update -> !existingWithEmailUsersProvider<local> && login exists && !emailIsValidated
     // should throw -> !existingWithEmailUsersProvider<local> && login exists && emailIsValidated || !email && !login && will add
+    // mail exists
+    // mail exists with local
     // should throw -> existingWithEmailUsersProvider<local> && emailIsValidated
     // should update -> existingWithEmailUsersProvider<local> && !emailIsValidated
+    // mail exists with non-local
+    // console.log('should throw -> existingWithLoginUsersProvider && emailIsValidated')
+    // console.log('should update -> existingWithLoginUsersProvider && !emailIsValidated')
     // should add to non-locals -> local does not exist
 
-    if (user.isLocalProvider()) {
-      // mail does not exist
-      if (!existingWithEmailUsersProvider) {
-        const existingWithLoginUsersProvider = await this.queryBus.execute(
-          new FindUsersProviderQuery({
-            [EUsersProviderFields.login]:
-              newUsersProvider[EUsersProviderFields.login],
-          }),
-        );
-        // login exists
-        if (
-          existingWithLoginUsersProvider &&
-          !existingWithLoginUsersProvider[EUsersProviderFields.emailIsValidated]
-        ) {
-          // and login unconfirmed
-          // console.log('should update -> login exists && !emailIsValidated')
-          await this.commandBus.execute(
-            new UpdateUsersProviderCommand(
-              existingWithLoginUsersProvider[EDbEntityFields.id],
-              {
-                [EUsersProviderFields.email]:
-                  newUsersProvider[EUsersProviderFields.email],
-                [EUsersProviderFields.name]:
-                  newUsersProvider[EUsersProviderFields.name],
-                [EUsersProviderFields.surname]:
-                  newUsersProvider[EUsersProviderFields.surname],
-                [EUsersProviderFields.password]:
-                  newUsersProvider[EUsersProviderFields.password],
-                [EUsersProviderFields.avatar]:
-                  newUsersProvider[EUsersProviderFields.avatar],
-              },
-            ),
-          );
-          return {
-            [EDbEntityFields.id]:
-              existingWithLoginUsersProvider[EUsersProviderFields.userLocalId],
-          };
-        }
+    const existingWithLoginUsersProvider = await this.queryBus.execute(
+      new FindUsersProviderQuery({
+        [EUsersProviderFields.login]:
+          newUsersProvider[EUsersProviderFields.login],
+      }),
+    );
 
-        // login does not exists or login confirmed
-        // console.log('should throw -> login && emailIsValidated || !email && !login && will create UsersProvider<local>')
-        return this.commandBus.execute(new CreateUserCommand(user));
-      }
-
-      // mail exists
-      const existingWithEmailUsersProviderProviderName =
-        existingWithEmailUsersProvider[EUsersProviderFields.provider][
-          EProviderFields.name
-        ];
-      if (existingWithEmailUsersProviderProviderName === EProvider.local) {
-        const emailIsValidated =
-          existingWithEmailUsersProvider[EUsersProviderFields.emailIsValidated];
-        if (emailIsValidated) {
-          // console.log('should throw -> existingWithEmailUsersProvider<local> && emailIsValidated')
-          return this.commandBus.execute(new CreateUserCommand(user));
-        }
-        // console.log('should update -> existingWithEmailUsersProvider<local> && !emailIsValidated')
-        await this.commandBus.execute(
-          new UpdateUsersProviderCommand(
-            existingWithEmailUsersProvider[EDbEntityFields.id],
-            {
-              [EUsersProviderFields.email]:
-                newUsersProvider[EUsersProviderFields.email],
-              [EUsersProviderFields.login]:
-                newUsersProvider[EUsersProviderFields.login],
-              [EUsersProviderFields.name]:
-                newUsersProvider[EUsersProviderFields.name],
-              [EUsersProviderFields.surname]:
-                newUsersProvider[EUsersProviderFields.surname],
-              [EUsersProviderFields.password]:
-                newUsersProvider[EUsersProviderFields.password],
-              [EUsersProviderFields.avatar]:
-                newUsersProvider[EUsersProviderFields.avatar],
-            },
-          ),
+    // mail does not exist
+    if (!existingWithEmailUsersProvider) {
+      // login exists
+      if (
+        existingWithLoginUsersProvider &&
+        !existingWithLoginUsersProvider[EUsersProviderFields.emailIsValidated]
+      ) {
+        // and login unconfirmed
+        // console.log('should update -> login exists && !emailIsValidated')
+        await this.updateUsersProvider(
+          existingWithLoginUsersProvider[EDbEntityFields.id],
+          newUsersProvider,
+          [
+            EUsersProviderFields.email,
+            EUsersProviderFields.name,
+            EUsersProviderFields.surname,
+            EUsersProviderFields.password,
+            EUsersProviderFields.avatar,
+          ],
         );
         return {
           [EDbEntityFields.id]:
-            existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
+            existingWithLoginUsersProvider[EUsersProviderFields.userLocalId],
         };
       }
 
-      // should add to non-locals -> local does not exist
-      const createUsersProviderCommand = new CreateUsersProviderCommand(
-        user.getProviderName(),
-        existingWithEmailUsersProvider[EUsersProviderFields.sub],
-        existingWithEmailUsersProvider[EUsersProviderFields.email],
-        newUsersProvider[EUsersProviderFields.login],
-        newUsersProvider[EUsersProviderFields.name],
-        newUsersProvider[EUsersProviderFields.surname],
-        newUsersProvider[EUsersProviderFields.password],
-        newUsersProvider[EUsersProviderFields.avatar],
-        newUsersProvider[EUsersProviderFields.emailIsValidated],
-        existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
+      // login does not exists or login confirmed
+      // console.log('should throw -> login && emailIsValidated || !email && !login && will create UsersProvider<local>')
+      return this.commandBus.execute(new CreateUserCommand(user));
+    }
+
+    // mail exists
+    // should be always selectes with local first!
+    const existingWithEmailUsersProviderProviderName =
+      existingWithEmailUsersProvider[EUsersProviderFields.provider][
+        EProviderFields.name
+      ];
+
+    // mail exists with local
+    if (existingWithEmailUsersProviderProviderName === EProvider.local) {
+      const emailIsValidated =
+        existingWithEmailUsersProvider[EUsersProviderFields.emailIsValidated];
+      if (emailIsValidated) {
+        // console.log('should throw -> existingWithEmailUsersProvider<local> && emailIsValidated')
+        return this.commandBus.execute(new CreateUserCommand(user));
+      }
+      // console.log('should update -> existingWithEmailUsersProvider<local> && !emailIsValidated')
+      await this.updateUsersProvider(
+        existingWithEmailUsersProvider[EDbEntityFields.id],
+        newUsersProvider,
+        [
+          EUsersProviderFields.email,
+          EUsersProviderFields.login,
+          EUsersProviderFields.name,
+          EUsersProviderFields.surname,
+          EUsersProviderFields.password,
+          EUsersProviderFields.avatar,
+        ],
       );
-      await this.commandBus.execute(createUsersProviderCommand);
       return {
         [EDbEntityFields.id]:
           existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
       };
     }
 
+    // mail exists with non-local
+    if (existingWithLoginUsersProvider) {
+      const emailIsValidated =
+        existingWithLoginUsersProvider[EUsersProviderFields.emailIsValidated];
+      if (emailIsValidated) {
+        // console.log('should throw -> existingWithEmailUsersProvider<local> && emailIsValidated')
+        return this.commandBus.execute(new CreateUserCommand(user));
+      }
+      // console.log('should update -> existingWithLoginUsersProvider<local> && !emailIsValidated')
+      await this.updateUsersProvider(
+        existingWithLoginUsersProvider[EDbEntityFields.id],
+        newUsersProvider,
+        [
+          EUsersProviderFields.email,
+          EUsersProviderFields.login,
+          EUsersProviderFields.name,
+          EUsersProviderFields.surname,
+          EUsersProviderFields.password,
+          EUsersProviderFields.avatar,
+        ],
+      );
+      return {
+        [EDbEntityFields.id]:
+          existingWithLoginUsersProvider[EUsersProviderFields.userLocalId],
+      };
+    }
+
+    // should add to non-locals -> local does not exist
+    return this.createUsersProvider(
+      user,
+      newUsersProvider,
+      existingWithEmailUsersProvider,
+    );
+  }
+
+  private async createUserWithusersExternalProviderOrUpdateUsersExternalProvider(
+    user: User,
+    newUsersProvider: IUsersProvider,
+    existingWithEmailUsersProvider: IUsersProvider,
+  ): Promise<Omit<IUser, EUserFields.providers>> {
     // non-local
     // email+provider && will update
     // sub+provider && will update
@@ -178,21 +254,17 @@ export class UsersService {
       );
     // email+provider && update
     if (existingWithEmailAndProviderUsersProvider) {
-      await this.commandBus.execute(
-        new UpdateUsersProviderCommand(
-          existingWithEmailAndProviderUsersProvider[EDbEntityFields.id],
-          {
-            [EUsersProviderFields.name]:
-              newUsersProvider[EUsersProviderFields.name],
-            [EUsersProviderFields.surname]:
-              newUsersProvider[EUsersProviderFields.surname],
-            [EUsersProviderFields.password]:
-              newUsersProvider[EUsersProviderFields.password],
-            [EUsersProviderFields.avatar]:
-              newUsersProvider[EUsersProviderFields.avatar],
-          },
-        ),
+      await this.updateUsersProvider(
+        existingWithEmailAndProviderUsersProvider[EDbEntityFields.id],
+        newUsersProvider,
+        [
+          EUsersProviderFields.name,
+          EUsersProviderFields.surname,
+          EUsersProviderFields.password,
+          EUsersProviderFields.avatar,
+        ],
       );
+
       return {
         [EDbEntityFields.id]:
           existingWithEmailAndProviderUsersProvider[
@@ -209,26 +281,20 @@ export class UsersService {
       }),
     );
     // sub+provider && update
-    if (existingWithProviderIdUsersProvider && !user.isLocalProvider()) {
-      await this.commandBus.execute(
-        new UpdateUsersProviderCommand(
-          existingWithProviderIdUsersProvider[EDbEntityFields.id],
-          {
-            [EUsersProviderFields.email]:
-              newUsersProvider[EUsersProviderFields.email],
-            [EUsersProviderFields.login]:
-              newUsersProvider[EUsersProviderFields.login],
-            [EUsersProviderFields.name]:
-              newUsersProvider[EUsersProviderFields.name],
-            [EUsersProviderFields.surname]:
-              newUsersProvider[EUsersProviderFields.surname],
-            [EUsersProviderFields.password]:
-              newUsersProvider[EUsersProviderFields.password],
-            [EUsersProviderFields.avatar]:
-              newUsersProvider[EUsersProviderFields.avatar],
-          },
-        ),
+    if (existingWithProviderIdUsersProvider) {
+      await this.updateUsersProvider(
+        existingWithProviderIdUsersProvider[EDbEntityFields.id],
+        newUsersProvider,
+        [
+          EUsersProviderFields.email,
+          EUsersProviderFields.login,
+          EUsersProviderFields.name,
+          EUsersProviderFields.surname,
+          EUsersProviderFields.password,
+          EUsersProviderFields.avatar,
+        ],
       );
+
       return {
         [EDbEntityFields.id]:
           existingWithProviderIdUsersProvider[EUsersProviderFields.userLocalId],
@@ -237,24 +303,11 @@ export class UsersService {
 
     // sub || provider email <- does not exist <- adds to existing
     if (existingWithEmailUsersProvider) {
-      const createUsersProviderCommand = new CreateUsersProviderCommand(
-        user.getProviderName(),
-        existingWithEmailUsersProvider[EUsersProviderFields.sub],
-        existingWithEmailUsersProvider[EUsersProviderFields.email],
-        newUsersProvider[EUsersProviderFields.login],
-        newUsersProvider[EUsersProviderFields.name],
-        newUsersProvider[EUsersProviderFields.surname],
-        newUsersProvider[EUsersProviderFields.password],
-        newUsersProvider[EUsersProviderFields.avatar],
-        newUsersProvider[EUsersProviderFields.emailIsValidated],
-        existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
+      return this.createUsersProvider(
+        user,
+        newUsersProvider,
+        existingWithEmailUsersProvider,
       );
-      await this.commandBus.execute(createUsersProviderCommand);
-
-      return {
-        [EDbEntityFields.id]:
-          existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
-      };
     }
 
     // non-local does not exist -> will add
