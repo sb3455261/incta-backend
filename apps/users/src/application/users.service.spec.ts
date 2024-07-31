@@ -5,38 +5,34 @@ import {
   EUsersProviderFields,
   EProvider,
   IUser,
+  appConfig,
 } from '@app/shared';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
 import { UsersService } from './users.service';
-import { UserRepository } from './ports/user-abstract.repository';
 import { UserFactory } from '../domain/factories/user.factory';
 import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
 import { User } from '../domain/user';
 import { FindUsersProviderQuery } from './queries/find-users-provider.query';
 import { FindProviderQuery } from './queries/find-provider.query';
 import { CreateUserCommand } from './commands/create-user.command';
+import { GetAllUsersQuery } from './queries/get-all-users.query';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let mockRepository: jest.Mocked<UserRepository>;
   let mockUserFactory: jest.Mocked<UserFactory>;
   let mockCommandBus: jest.Mocked<CommandBus>;
   let mockQueryBus: jest.Mocked<QueryBus>;
 
   beforeEach(async () => {
+    const mockConfig = createMockAppConfig();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         {
-          provide: UserRepository,
-          useFactory: () => ({
-            findAll: jest.fn(),
-            create: jest.fn(),
-            findUsersProvider: jest.fn(),
-            findProvider: jest.fn(),
-            update: jest.fn(),
-            createProvider: jest.fn(),
-          }),
+          provide: appConfig.KEY,
+          useValue: mockConfig,
         },
         {
           provide: UserFactory,
@@ -60,7 +56,6 @@ describe('UsersService', () => {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    mockRepository = module.get(UserRepository) as jest.Mocked<UserRepository>;
     mockUserFactory = module.get(UserFactory) as jest.Mocked<UserFactory>;
     mockCommandBus = module.get(CommandBus) as jest.Mocked<CommandBus>;
     mockQueryBus = module.get(QueryBus) as jest.Mocked<QueryBus>;
@@ -98,10 +93,12 @@ describe('UsersService', () => {
       const result = await service.findAll();
 
       expect(result).toEqual(mockUsers);
-      expect(mockQueryBus.execute).toHaveBeenCalled();
+      expect(mockQueryBus.execute).toHaveBeenCalledWith(
+        expect.any(GetAllUsersQuery),
+      );
     });
 
-    it('should throw Error when repository throws an error', async () => {
+    it('should throw Error when query bus throws an error', async () => {
       const errorMessage = 'Database error';
       mockQueryBus.execute.mockRejectedValue(new Error(errorMessage));
 

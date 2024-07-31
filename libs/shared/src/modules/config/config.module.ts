@@ -24,6 +24,7 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     USERPASSWORD_MIN_LENGHT: +process.env.USERPASSWORD_MIN_LENGHT,
     USERPASSWORD_MAX_LENGHT: +process.env.USERPASSWORD_MAX_LENGHT,
     USERPASSWORD_ALLOWED_SYMBOLS: process.env.USERPASSWORD_ALLOWED_SYMBOLS,
+    USERS_EMAIL_CONFIRMATION_TTL: +process.env.USERS_EMAIL_CONFIRMATION_TTL,
   };
 
   const schema = Joi.object({
@@ -41,6 +42,7 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     USERPASSWORD_MIN_LENGHT: Joi.number(),
     USERPASSWORD_MAX_LENGHT: Joi.number(),
     USERPASSWORD_ALLOWED_SYMBOLS: Joi.string(),
+    USERS_EMAIL_CONFIRMATION_TTL: Joi.number(),
   });
 
   const { error } = schema.validate(configValues, { abortEarly: false });

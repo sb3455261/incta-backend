@@ -22,7 +22,20 @@ export class PrismaUserRepository extends UserRepository {
     where: Partial<IUsersProvider>,
   ): Promise<IUsersProvider | null> {
     return this.prisma.usersProvider.findFirst({
-      where,
+      where: {
+        AND: [
+          { ...where },
+          {
+            OR: [
+              { provider: { name: EProvider.local } },
+              { provider: { name: { not: { equals: '' } } } },
+            ],
+          },
+        ],
+      },
+      include: {
+        provider: true,
+      },
     });
   }
 
@@ -79,6 +92,14 @@ export class PrismaUserRepository extends UserRepository {
         [EProviderFields.name]: providerName,
       },
       select: { [EDbEntityFields.id]: true },
+    });
+  }
+
+  async delete(userId: string): Promise<void> {
+    await this.prisma.user.delete({
+      where: {
+        [EDbEntityFields.id]: userId,
+      },
     });
   }
 }

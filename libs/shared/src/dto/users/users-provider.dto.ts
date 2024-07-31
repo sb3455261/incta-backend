@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsBoolean,
 } from 'class-validator';
+import { Expose, Transform } from 'class-transformer';
 import { EProvider, EUsersProviderFields } from '../../types/user/user.type';
 import { appConfig as _appConfig } from '../../modules/config/config.module';
 
@@ -55,10 +56,10 @@ export class UsersProviderDto {
   @MaxLength(appConfig.USERNAME_MAX_LENGHT)
   public readonly [EUsersProviderFields.surname]?: string;
 
-  @IsString()
   @ValidateIf(
     (_this) => _this[EUsersProviderFields.providerName] === EProvider.local,
   )
+  @IsString()
   @MinLength(appConfig.USERPASSWORD_MIN_LENGHT)
   @MaxLength(appConfig.USERPASSWORD_MAX_LENGHT)
   @Matches(new RegExp(`^${appConfig.USERPASSWORD_ALLOWED_SYMBOLS}.*$`), {
@@ -66,6 +67,26 @@ export class UsersProviderDto {
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
   })
   public readonly [EUsersProviderFields.password]: string;
+
+  @ValidateIf(
+    (_this) => _this[EUsersProviderFields.providerName] === EProvider.local,
+  )
+  @Expose()
+  @Transform(({ obj }) =>
+    obj[EUsersProviderFields.password] ===
+    obj[EUsersProviderFields.repeatPassword]
+      ? obj[EUsersProviderFields.repeatPassword]
+      : '',
+  )
+  @IsNotEmpty({
+    message: 'Password and repeat password should match',
+  })
+  public readonly [EUsersProviderFields.repeatPassword]: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(10)
+  public readonly [EUsersProviderFields.agreement]: string;
 
   @IsOptional()
   @IsString()

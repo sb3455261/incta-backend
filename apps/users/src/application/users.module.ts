@@ -14,6 +14,8 @@ import { GetAllUsersQueryHandler } from './queries/get-all-users.query.handler';
 import { CreateUserCommandHandler } from './commands/create-user.command.handler';
 import { FindUsersProviderQueryHandler } from './queries/find-users-provider.query.handler';
 import { FindProviderQueryHandler } from './queries/find-provider.query.handler';
+import { UpdateUsersProviderCommandHandler } from './commands/update-users-provider.command.handler';
+import { DeleteUserCommandHandler } from './commands/delete-user.command.handler';
 
 @Module({})
 export class UsersModule {
@@ -30,9 +32,11 @@ export class UsersModule {
         UsersService,
         UserFactory,
         UsersProviderFactory,
-        CreateUsersProviderCommandHandler,
-        GetAllUsersQueryHandler,
         CreateUserCommandHandler,
+        CreateUsersProviderCommandHandler,
+        UpdateUsersProviderCommandHandler,
+        DeleteUserCommandHandler,
+        GetAllUsersQueryHandler,
         FindUsersProviderQueryHandler,
         FindProviderQueryHandler,
       ],
