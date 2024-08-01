@@ -9,24 +9,29 @@ import {
 import { catchError, Observable, throwError } from 'rxjs';
 
 @Injectable()
-export class UsersErrorInterceptor implements NestInterceptor {
+export class GatwayErrorInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       catchError((error) => {
-        if (error.code === HttpStatus.BAD_REQUEST) {
+        const httpEnumStatus = (error?.response?.error as string)
+          ?.toUpperCase()
+          ?.replace(' ', '_');
+        if (HttpStatus[httpEnumStatus]) {
           return throwError(
-            () => new HttpException(error.message, HttpStatus.BAD_REQUEST),
+            () => new HttpException(error.message, HttpStatus[httpEnumStatus]),
           );
         }
-        if (
-          error.name === 'PrismaClientKnownRequestError' &&
-          error.code === 'P2002'
-        ) {
+        if (error.code === 'P2002') {
           return throwError(
             () => new HttpException('Entity exists', HttpStatus.CONFLICT),
           );
         }
+
+        console.error('');
+        console.error('UsersErrorInterceptor Error:');
         console.error(error);
+        console.error('');
+
         return throwError(
           () =>
             new HttpException(

@@ -8,17 +8,36 @@ import {
   appConfig as _appConfig,
   TAppConfig,
   IUsersProvider,
+  EUsersRoutes,
+  EGatewayRoutes,
+  TFindUserByEmailOrLoginQueryHandlerReturnType,
+  ForgotUsersProviderPasswordDto,
+  ResetUsersProviderPasswordDto,
+  EUsersParams,
+  EAuthRoutes,
 } from '@app/shared';
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { JwtService } from '@nestjs/jwt';
+import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
 import { UserFactory } from '../domain/factories/user.factory';
-import { GetAllUsersQuery } from './queries/get-all-users.query';
 import { CreateUserCommand } from './commands/create-user.command';
 import { FindUsersProviderQuery } from './queries/find-users-provider.query';
 import { FindProviderQuery } from './queries/find-provider.query';
 import { UpdateUsersProviderCommand } from './commands/update-users-provider.command';
 import { User } from '../domain/user';
+import { ConfirmUsersLocalProviderEmailCommand } from './commands/confirm-users-local-provider-email-command';
+import { FindUsersProviderByEmailOrLoginQuery } from './queries/find-users-provider-by-email-or-login.query';
+import { UsersProviderFactory } from '../domain/factories/users-provider.factory';
+
+const config = _appConfig();
 
 @Injectable()
 export class UsersService {
@@ -26,29 +45,37 @@ export class UsersService {
     @Inject(_appConfig.KEY)
     private readonly appConfig: TAppConfig,
     private readonly userFactory: UserFactory,
+    private readonly usersProviderFactory: UsersProviderFactory,
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly jwtService: JwtService,
+    @Inject(config.AUTH_MICROSERVICE_NAME)
+    private readonly authClient: ClientProxy,
   ) {}
 
-  async findAll(): Promise<IUser[]> {
-    return this.queryBus.execute(new GetAllUsersQuery());
+  // RETURNS PASSWORD & EMAIL
+  async findUsersProviderByEmailOrLogin(
+    emailOrLogin: string,
+  ): Promise<TFindUserByEmailOrLoginQueryHandlerReturnType | undefined> {
+    return this.commandBus.execute(
+      new FindUsersProviderByEmailOrLoginQuery(emailOrLogin),
+    );
   }
 
   async create(
     usersProvider: CreateUsersProviderCommand,
   ): Promise<Omit<IUser, EUserFields.providers>> {
     const existingWithEmailUsersProvider = await this.queryBus.execute(
+      // should search for the 'local' first <- this is a required condition
       new FindUsersProviderQuery({
         [EUsersProviderFields.email]: usersProvider[EUsersProviderFields.email],
       }),
     );
-
-    const user = this.userFactory.create(
+    const user = await this.userFactory.create(
       usersProvider,
       existingWithEmailUsersProvider?.[EUsersProviderFields.userLocalId],
     );
     const provider = await this.queryBus.execute(
-      // finds 'local' first
       new FindProviderQuery(user.getProviderName()),
     );
     user.setProviderLocalId(provider.id);
@@ -61,14 +88,14 @@ export class UsersService {
         existingWithEmailUsersProvider,
       );
     }
-    return this.createUserWithusersExternalProviderOrUpdateUsersExternalProvider(
+    return this.createUserWithUsersExternalProviderOrUpdateUsersExternalProvider(
       user,
       newUsersProvider,
       existingWithEmailUsersProvider,
     );
   }
 
-  private async createUsersProvider(
+  private async addUsersProviderToExistingUser(
     user: User,
     newUsersProvider: IUsersProvider,
     existingUsersProvider: IUsersProvider,
@@ -76,7 +103,7 @@ export class UsersService {
     const createUsersProviderCommand = new CreateUsersProviderCommand(
       user.getProviderName(),
       newUsersProvider[EUsersProviderFields.sub],
-      existingUsersProvider[EUsersProviderFields.email],
+      newUsersProvider[EUsersProviderFields.email],
       newUsersProvider[EUsersProviderFields.login],
       newUsersProvider[EUsersProviderFields.name],
       newUsersProvider[EUsersProviderFields.surname],
@@ -108,22 +135,36 @@ export class UsersService {
   }
 
   private async createUserWithUsersLocalProviderOrUpdateUsersLocalProvider(
-    user: ReturnType<UserFactory['create']>,
+    user: User,
     newUsersProvider: IUsersProvider,
     existingWithEmailUsersProvider: IUsersProvider,
   ): Promise<Omit<IUser, EUserFields.providers>> {
-    // local
     // mail does not exist
+
+    // should send verification email
     // should update -> !existingWithEmailUsersProvider<local> && login exists && !emailIsValidated
+
+    // should send verification email if it did not throw
     // should throw -> !existingWithEmailUsersProvider<local> && login exists && emailIsValidated || !email && !login && will add
+
     // mail exists
+
     // mail exists with local
+
     // should throw -> existingWithEmailUsersProvider<local> && emailIsValidated
+
+    // should send verification email
     // should update -> existingWithEmailUsersProvider<local> && !emailIsValidated
-    // mail exists with non-local
+
+    // mail exists with external
+
     // console.log('should throw -> existingWithLoginUsersProvider && emailIsValidated')
+
+    // should send verification email
     // console.log('should update -> existingWithLoginUsersProvider && !emailIsValidated')
-    // should add to non-locals -> local does not exist
+
+    // should add -> local does not exist
+    // should send verification email
 
     const existingWithLoginUsersProvider = await this.queryBus.execute(
       new FindUsersProviderQuery({
@@ -152,6 +193,12 @@ export class UsersService {
             EUsersProviderFields.avatar,
           ],
         );
+        // should send verification email
+        await this.sendVerificationEmailToVerifyProviderEmail(
+          existingWithLoginUsersProvider[EDbEntityFields.id],
+          newUsersProvider[EUsersProviderFields.email],
+        );
+
         return {
           [EDbEntityFields.id]:
             existingWithLoginUsersProvider[EUsersProviderFields.userLocalId],
@@ -159,12 +206,23 @@ export class UsersService {
       }
 
       // login does not exists or login confirmed
-      // console.log('should throw -> login && emailIsValidated || !email && !login && will create UsersProvider<local>')
-      return this.commandBus.execute(new CreateUserCommand(user));
+      // console.log('should throw -> login exists || !email && !login && will create UsersProvider<local>')
+      const createdUser = await this.commandBus.execute(
+        new CreateUserCommand(user),
+      );
+      // should send verification email if it did not throw
+      await this.sendVerificationEmailToVerifyProviderEmail(
+        newUsersProvider[EDbEntityFields.id],
+        newUsersProvider[EUsersProviderFields.email],
+      );
+
+      return {
+        [EDbEntityFields.id]: createdUser[EDbEntityFields.id],
+      };
     }
 
     // mail exists
-    // should be always selectes with local first!
+    // should be always selected with local first!
     const existingWithEmailUsersProviderProviderName =
       existingWithEmailUsersProvider[EUsersProviderFields.provider][
         EProviderFields.name
@@ -191,13 +249,19 @@ export class UsersService {
           EUsersProviderFields.avatar,
         ],
       );
+      // should send verification email
+      await this.sendVerificationEmailToVerifyProviderEmail(
+        existingWithEmailUsersProvider[EDbEntityFields.id],
+        newUsersProvider[EUsersProviderFields.email],
+      );
+
       return {
         [EDbEntityFields.id]:
           existingWithEmailUsersProvider[EUsersProviderFields.userLocalId],
       };
     }
 
-    // mail exists with non-local
+    // mail exists with external
     if (existingWithLoginUsersProvider) {
       const emailIsValidated =
         existingWithLoginUsersProvider[EUsersProviderFields.emailIsValidated];
@@ -218,21 +282,208 @@ export class UsersService {
           EUsersProviderFields.avatar,
         ],
       );
+      // should send verification email
+      await this.sendVerificationEmailToVerifyProviderEmail(
+        existingWithLoginUsersProvider[EDbEntityFields.id],
+        newUsersProvider[EUsersProviderFields.email],
+      );
+
       return {
         [EDbEntityFields.id]:
           existingWithLoginUsersProvider[EUsersProviderFields.userLocalId],
       };
     }
 
-    // should add to non-locals -> local does not exist
-    return this.createUsersProvider(
+    // should add -> local does not exist
+    const result = this.addUsersProviderToExistingUser(
       user,
       newUsersProvider,
       existingWithEmailUsersProvider,
     );
+    // should send verification email
+    await this.sendVerificationEmailToVerifyProviderEmail(
+      newUsersProvider[EDbEntityFields.id],
+      newUsersProvider[EUsersProviderFields.email],
+    );
+
+    return result;
   }
 
-  private async createUserWithusersExternalProviderOrUpdateUsersExternalProvider(
+  private generateEmailVerificationToken(
+    newUsersLocalProviderId: string,
+  ): string {
+    return this.jwtService.sign(
+      { [EDbEntityFields.id]: newUsersLocalProviderId },
+      {
+        secret: this.appConfig.AUTH_JWT_SECRET,
+        expiresIn: this.appConfig.USERS_EMAIL_CONFIRMATION_TTL / 1000,
+      },
+    );
+  }
+
+  async verifyEmailVerificationToken(token: string): Promise<boolean> {
+    try {
+      const decoded = this.jwtService.verify(token, {
+        secret: this.appConfig.AUTH_JWT_SECRET,
+      });
+
+      const usersProvider = await this.queryBus.execute(
+        new FindUsersProviderQuery({
+          [EDbEntityFields.id]: decoded[EDbEntityFields.id],
+        }),
+      );
+      if (!usersProvider) {
+        return false;
+      }
+      await this.commandBus.execute(
+        new ConfirmUsersLocalProviderEmailCommand(decoded[EDbEntityFields.id]),
+      );
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // TODO<
+  private async addEMailToQueue(email: string, message: string): Promise<any> {
+    // TODO
+    // add email to queue
+
+    console.debug('');
+    console.debug('addEMailToQueue');
+    console.debug(email, 'email');
+    console.debug(message, 'message');
+    console.debug('');
+  }
+
+  private async sendVerificationEmailToVerifyProviderEmail(
+    usersProviderId: string,
+    email: string,
+  ): Promise<void> {
+    const verificationToken =
+      this.generateEmailVerificationToken(usersProviderId);
+    const url = `https://${EGatewayRoutes.gateway}.incta.team/${this.appConfig.APP_API_PREFIX}/${EUsersRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/${verificationToken}`;
+    const message = `
+        <div>Please follow this link to verify your email address</div>
+        <div>
+            <a href="${url}">Verify email</a>
+        </div>
+        <div>Current time is: ${Date.now()}</div>
+        <div>The link validity expires at ${Date.now() + this.appConfig.USERS_EMAIL_CONFIRMATION_TTL}</div>
+    `;
+    await this.addEMailToQueue(email, message);
+  }
+
+  private async sendResetPasswordEmail(
+    usersProviderId: string,
+    email: string,
+  ): Promise<void> {
+    const token = this.generatePasswordResetToken(usersProviderId);
+    const url = `https://incta.team/auth/reset-password/${token}`;
+    const message = `
+        <div>Please follow this link to reset your password</div>
+        <div>
+            <a href="${url}">Reset password</a>
+        </div>
+        <div>Current time is: ${Date.now()}</div>
+        <div>Please copmplet your password recovery before: ${Date.now() + this.appConfig.USERS_PASSWORD_RESET_TOKEN_TTL / 1000} </div>
+    `;
+    await this.addEMailToQueue(email, message);
+  }
+
+  private async sendPasswordWasChangedEmail(email: string): Promise<void> {
+    const message = `
+        <div>Your password was succesfully changed.</div>
+    `;
+    await this.addEMailToQueue(email, message);
+  }
+  // TODO/>
+
+  async forgotPassword(
+    forgotUsersProviderPasswordDto: ForgotUsersProviderPasswordDto,
+  ): Promise<void> {
+    const usersProvider = await this.findUsersProviderByEmailOrLogin(
+      forgotUsersProviderPasswordDto[EUsersProviderFields.emailOrLogin],
+    );
+    if (!usersProvider) {
+      throw new NotFoundException('User not found');
+    }
+    await this.sendResetPasswordEmail(
+      usersProvider[EDbEntityFields.id],
+      usersProvider[EUsersProviderFields.email],
+    );
+  }
+
+  async resetPassword(
+    resetUsersProviderPasswordDto: ResetUsersProviderPasswordDto,
+  ): Promise<void> {
+    const decoded = this.verifyPasswordResetToken(
+      resetUsersProviderPasswordDto[EUsersParams.token],
+    );
+    if (!decoded) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+    const usersProvider = await this.queryBus.execute(
+      new FindUsersProviderQuery({
+        [EDbEntityFields.id]: decoded[EDbEntityFields.id],
+      }),
+    );
+    if (!usersProvider) {
+      throw new NotFoundException('User not found');
+    }
+    await this.updateUsersProviderPassword(
+      decoded[EDbEntityFields.id],
+      resetUsersProviderPasswordDto[EUsersProviderFields.password],
+    );
+    await firstValueFrom(
+      this.authClient.send(
+        { cmd: EAuthRoutes.deleteAllUsersProviderSessions },
+        {
+          userId: usersProvider[EUsersProviderFields.userLocalId],
+          providerName: usersProvider[EUsersProviderFields.providerName],
+        },
+      ),
+    );
+    await this.sendPasswordWasChangedEmail(
+      usersProvider[EUsersProviderFields.email],
+    );
+  }
+
+  private generatePasswordResetToken(usersProviderLocalId: string): string {
+    return this.jwtService.sign(
+      { [EDbEntityFields.id]: usersProviderLocalId },
+      {
+        secret: this.appConfig.USERS_JWT_SECRET,
+        expiresIn: this.appConfig.USERS_PASSWORD_RESET_TOKEN_TTL / 1000,
+      },
+    );
+  }
+
+  private verifyPasswordResetToken(
+    token: string,
+  ): { [EDbEntityFields.id]: string } | undefined {
+    try {
+      return this.jwtService.verify(token, {
+        secret: this.appConfig.USERS_JWT_SECRET,
+      });
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async updateUsersProviderPassword(
+    usersProviderId: string,
+    newPassword: string,
+  ): Promise<void> {
+    await this.commandBus.execute(
+      new UpdateUsersProviderCommand(usersProviderId, {
+        [EUsersProviderFields.password]:
+          await this.usersProviderFactory.hashPassword(newPassword),
+      }),
+    );
+  }
+
+  private async createUserWithUsersExternalProviderOrUpdateUsersExternalProvider(
     user: User,
     newUsersProvider: IUsersProvider,
     existingWithEmailUsersProvider: IUsersProvider,
@@ -246,6 +497,8 @@ export class UsersService {
     const existingWithEmailAndProviderUsersProvider =
       await this.queryBus.execute(
         new FindUsersProviderQuery({
+          [EUsersProviderFields.sub]:
+            newUsersProvider[EUsersProviderFields.sub],
           [EUsersProviderFields.email]:
             newUsersProvider[EUsersProviderFields.email],
           [EUsersProviderFields.providerLocalId]:
@@ -303,14 +556,14 @@ export class UsersService {
 
     // sub || provider email <- does not exist <- adds to existing
     if (existingWithEmailUsersProvider) {
-      return this.createUsersProvider(
+      return this.addUsersProviderToExistingUser(
         user,
         newUsersProvider,
         existingWithEmailUsersProvider,
       );
     }
 
-    // non-local does not exist -> will add
+    // external does not exist -> will add
     return this.commandBus.execute(new CreateUserCommand(user));
   }
 }

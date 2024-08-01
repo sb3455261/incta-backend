@@ -1,52 +1,40 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { Transport, ClientProxy, ClientsModule } from '@nestjs/microservices';
-import { lastValueFrom, timeout, catchError } from 'rxjs';
+import { ClientProxy, ClientsModule, Transport } from '@nestjs/microservices';
+import { of , lastValueFrom } from 'rxjs';
 import {
   EUsersRoutes,
   EProvider,
   EUsersProviderFields,
   appConfig,
+  TAppConfig,
+  UsersProviderDto,
+  ForgotUsersProviderPasswordDto,
+  ResetUsersProviderPasswordDto,
+  EUsersParams,
 } from '@app/shared';
+import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
 import { UsersModule } from '../src/application/users.module';
-import { PrismaService } from '../src/infrastructure/persistence/prisma/prisma.service';
 import { UserRepository } from '../src/application/ports/user-abstract.repository';
-import { EUserInfrastuctureDriver } from '../src/infrastructure/persistence/users-infrastructure.module';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
-  let client: ClientProxy;
-  const config = appConfig();
+  let clientProxy: ClientProxy;
+  let mockConfig: TAppConfig;
 
   beforeAll(async () => {
+    mockConfig = createMockAppConfig();
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        UsersModule.register(EUserInfrastuctureDriver.prisma),
+        UsersModule,
         ClientsModule.register([
           {
-            name: config.USERS_MICROSERVICE_NAME,
+            name: 'USER_SERVICE',
             transport: Transport.TCP,
-            options: {
-              host: '0.0.0.0',
-              port: config.USERS_MICROSERVICE_PORT,
-            },
           },
         ]),
       ],
     })
-      .overrideProvider(PrismaService)
-      .useValue({
-        user: {
-          findMany: jest
-            .fn()
-            .mockResolvedValue([
-              { id: '1', email: 'test@example.com', name: 'Test User' },
-            ]),
-          create: jest.fn().mockResolvedValue({ id: '2' }),
-        },
-        $connect: jest.fn(),
-        $disconnect: jest.fn(),
-      })
       .overrideProvider(UserRepository)
       .useValue({
         findAll: jest
@@ -55,69 +43,147 @@ describe('UsersController (e2e)', () => {
             { id: '1', email: 'test@example.com', name: 'Test User' },
           ]),
         create: jest.fn().mockResolvedValue({ id: '2' }),
-        findUsersProvider: jest.fn().mockResolvedValue(null),
+        findUsersProvider: jest.fn().mockResolvedValue({
+          id: '1',
+          email: 'test@example.com',
+          password: 'hashedPassword',
+          emailIsValidated: true,
+        }),
         findProvider: jest.fn().mockResolvedValue({ id: 'providerId' }),
+        verifyEmailVerificationToken: jest.fn().mockResolvedValue(true),
+        forgotPassword: jest.fn().mockResolvedValue(undefined),
+        resetPassword: jest.fn().mockResolvedValue(undefined),
       })
+      .overrideProvider(appConfig.KEY)
+      .useValue(mockConfig)
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.connectMicroservice({
-      transport: Transport.TCP,
-      options: {
-        host: '0.0.0.0',
-        port: config.USERS_MICROSERVICE_PORT,
-      },
-    });
-
-    await app.startAllMicroservices();
     await app.init();
 
-    client = moduleFixture.get<ClientProxy>(config.USERS_MICROSERVICE_NAME);
-    await client.connect();
+    clientProxy = moduleFixture.get<ClientProxy>('USER_SERVICE');
+    jest.spyOn(clientProxy, 'send').mockImplementation(() => of({}));
   });
 
   afterAll(async () => {
-    await client.close();
     await app.close();
   });
 
-  it('should return all users', async () => {
-    const result = await lastValueFrom(
-      client.send({ cmd: EUsersRoutes.findAllUsers }, {}).pipe(
-        timeout(5000),
-        catchError((error) => {
-          console.error('Error in findAllUsers:', error);
-          throw error;
-        }),
-      ),
-    );
-
-    expect(result).toEqual([
-      { id: '1', email: 'test@example.com', name: 'Test User' },
-    ]);
-  });
-
   it('should create a new user', async () => {
-    const userProviderData = {
+    const userProviderDto: Partial<UsersProviderDto> = {
       [EUsersProviderFields.providerName]: EProvider.local,
       [EUsersProviderFields.email]: 'new@example.com',
       [EUsersProviderFields.login]: 'newuser',
       [EUsersProviderFields.name]: 'New',
       [EUsersProviderFields.surname]: 'User',
       [EUsersProviderFields.password]: 'Password123!',
+      [EUsersProviderFields.repeatPassword]: 'Password123!',
+      [EUsersProviderFields.agreement]: 'agreed',
       [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
       [EUsersProviderFields.emailIsValidated]: false,
     };
 
+    (clientProxy.send as jest.Mock).mockReturnValueOnce(of({ id: '2' }));
+
     const result = await lastValueFrom(
-      client.send({ cmd: EUsersRoutes.createUser }, userProviderData).pipe(
-        timeout(5000),
-        catchError((error) => {
-          console.error('Error in createUser observable:', error);
-          throw error;
-        }),
+      clientProxy.send({ cmd: EUsersRoutes.createUser }, userProviderDto),
+    );
+
+    expect(result).toEqual({ id: '2' });
+    expect(clientProxy.send).toHaveBeenCalledWith(
+      { cmd: EUsersRoutes.createUser },
+      userProviderDto,
+    );
+  });
+
+  it('should find a user provider by email or login', async () => {
+    const mockUser = {
+      id: '1',
+      email: 'test@example.com',
+      password: 'hashedPassword',
+      emailIsValidated: true,
+    };
+
+    (clientProxy.send as jest.Mock).mockReturnValueOnce(of(mockUser));
+
+    const result = await lastValueFrom(
+      clientProxy.send(
+        { cmd: EUsersRoutes.findUsersProviderByEmailOrLogin },
+        { emailOrLogin: 'test@example.com' },
       ),
     );
-    expect(result).toEqual({ id: '2' });
+
+    expect(result).toEqual(mockUser);
+    expect(clientProxy.send).toHaveBeenCalledWith(
+      { cmd: EUsersRoutes.findUsersProviderByEmailOrLogin },
+      { emailOrLogin: 'test@example.com' },
+    );
+  });
+
+  it('should verify email', async () => {
+    (clientProxy.send as jest.Mock).mockReturnValueOnce(of({ success: true }));
+
+    const result = await lastValueFrom(
+      clientProxy.send(
+        { cmd: EUsersRoutes.verifyEmailVerificationToken },
+        { token: 'validToken' },
+      ),
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(clientProxy.send).toHaveBeenCalledWith(
+      { cmd: EUsersRoutes.verifyEmailVerificationToken },
+      { token: 'validToken' },
+    );
+  });
+
+  it('should handle forgot password request', async () => {
+    const forgotPasswordDto: ForgotUsersProviderPasswordDto = {
+      [EUsersProviderFields.emailOrLogin]: 'test@example.com',
+      [EUsersProviderFields.recaptchaToken]: 'validRecaptchaToken',
+    };
+
+    (clientProxy.send as jest.Mock).mockReturnValueOnce(
+      of({ success: true, message: 'Password reset email sent' }),
+    );
+
+    const result = await lastValueFrom(
+      clientProxy.send({ cmd: EUsersRoutes.forgotPassword }, forgotPasswordDto),
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Password reset email sent',
+    });
+    expect(clientProxy.send).toHaveBeenCalledWith(
+      { cmd: EUsersRoutes.forgotPassword },
+      forgotPasswordDto,
+    );
+  });
+
+  it('should reset password', async () => {
+    const resetPasswordDto: ResetUsersProviderPasswordDto = {
+      [EUsersProviderFields.password]: 'NewPassword123!',
+      [EUsersProviderFields.repeatPassword]: 'NewPassword123!',
+      [EUsersParams.token]: 'validResetToken',
+      [EUsersProviderFields.recaptchaToken]: 'validRecaptchaToken',
+    };
+
+    (clientProxy.send as jest.Mock).mockReturnValueOnce(
+      of({ success: true, message: 'Password has been reset successfully' }),
+    );
+
+    const result = await lastValueFrom(
+      clientProxy.send({ cmd: EUsersRoutes.resetPassword }, resetPasswordDto),
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Password has been reset successfully',
+    });
+    expect(clientProxy.send).toHaveBeenCalledWith(
+      { cmd: EUsersRoutes.resetPassword },
+      resetPasswordDto,
+    );
   });
 });

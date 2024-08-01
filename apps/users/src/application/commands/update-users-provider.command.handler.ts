@@ -10,6 +10,6 @@ export class UpdateUsersProviderCommandHandler
 
   async execute(command: UpdateUsersProviderCommand): Promise<void> {
     const { id, data } = command;
-    await this.repository.update(id, data);
+    await this.repository.updateUsersProvider(id, data);
   }
 }

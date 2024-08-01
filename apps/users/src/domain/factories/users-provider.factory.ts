@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  BcryptService,
   EDbEntityFields,
   EProvider,
   EUsersProviderFields,
@@ -10,25 +11,29 @@ import { UsersProvider } from '../users-provider';
 
 @Injectable()
 export class UsersProviderFactory {
-  create(
+  constructor(private readonly bcryptService: BcryptService) {}
+
+  async create(
     userId: string,
     providerName: EProvider,
     usersProvider: CreateUsersProviderCommand,
-  ): IUsersProvider {
+  ): Promise<IUsersProvider> {
     return UsersProvider.create(
       userId,
       providerName,
-      this.mapCommandToProviderData(usersProvider),
+      await this.mapCommandToProviderData(usersProvider),
     );
   }
 
-  private mapCommandToProviderData(
+  private async mapCommandToProviderData(
     data: CreateUsersProviderCommand,
-  ): Omit<
-    IUsersProvider,
-    | EDbEntityFields.id
-    | EUsersProviderFields.userLocalId
-    | EUsersProviderFields.providerLocalId
+  ): Promise<
+    Omit<
+      IUsersProvider,
+      | EDbEntityFields.id
+      | EUsersProviderFields.userLocalId
+      | EUsersProviderFields.providerLocalId
+    >
   > {
     return {
       [EUsersProviderFields.sub]: data[EUsersProviderFields.sub],
@@ -36,10 +41,16 @@ export class UsersProviderFactory {
       [EUsersProviderFields.login]: data[EUsersProviderFields.login],
       [EUsersProviderFields.name]: data[EUsersProviderFields.name],
       [EUsersProviderFields.surname]: data[EUsersProviderFields.surname],
-      [EUsersProviderFields.password]: data[EUsersProviderFields.password],
+      [EUsersProviderFields.password]: await this.hashPassword(
+        data[EUsersProviderFields.password],
+      ),
       [EUsersProviderFields.avatar]: data[EUsersProviderFields.avatar],
       [EUsersProviderFields.emailIsValidated]:
         data[EUsersProviderFields.providerName] !== EProvider.local,
     };
+  }
+
+  async hashPassword(password: string) {
+    return this.bcryptService.hash(password);
   }
 }
