@@ -16,6 +16,8 @@ import { FindUsersProviderQueryHandler } from './queries/find-users-provider.que
 import { FindProviderQueryHandler } from './queries/find-provider.query.handler';
 import { UpdateUsersProviderCommandHandler } from './commands/update-users-provider.command.handler';
 import { DeleteUserCommandHandler } from './commands/delete-user.command.handler';
+import { EmailNotifierModule } from '../../../email-notifier/email-notifier.module';
+import { EmailNotifierService } from '../../../email-notifier/email-notifier.service';
 
 @Module({})
 export class UsersModule {
@@ -26,9 +28,11 @@ export class UsersModule {
         CqrsModule.forRoot(),
         AppConfigModule,
         UserInfrastructureModule.use(driver),
+        EmailNotifierModule
       ],
       controllers: [UsersController],
       providers: [
+        EmailNotifierService,
         UsersService,
         UserFactory,
         UsersProviderFactory,
