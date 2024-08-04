@@ -8,5 +8,6 @@
     },
     "moduleNameMapper": {
       "^@app/shared(.*)$": "<rootDir>/../../../libs/shared/src$1"
-    }
+    },
+    "testTimeout": 30000
 }

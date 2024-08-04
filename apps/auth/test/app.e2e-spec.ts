@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { ClientProxy, ClientsModule, Transport } from '@nestjs/microservices';
-import { of , lastValueFrom } from 'rxjs';
+import { of, lastValueFrom } from 'rxjs';
 import {
   EAuthRoutes,
   EProvider,
