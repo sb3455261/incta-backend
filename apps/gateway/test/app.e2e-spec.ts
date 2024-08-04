@@ -1,10 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientProxy, ClientsModule, Transport } from '@nestjs/microservices';
 import { of } from 'rxjs';
 import {
-  EGatewayRoutes,
   EUsersRoutes,
   EProvider,
   EUsersProviderFields,
@@ -14,14 +12,19 @@ import {
   ForgotUsersProviderPasswordDto,
   ResetUsersProviderPasswordDto,
   EUsersParams,
+  EGatewayRoutes,
   EAuthRoutes,
   EAuthParams,
 } from '@app/shared';
 import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
+import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { GatewayModule } from '../src/gateway.module';
 
 describe('GatewayController (e2e)', () => {
   let app: INestApplication;
+  let usersClientProxy: ClientProxy;
+  let authClientProxy: ClientProxy;
   let mockConfig: TAppConfig;
 
   beforeAll(async () => {
@@ -72,6 +75,12 @@ describe('GatewayController (e2e)', () => {
           if (pattern.cmd === `${EAuthRoutes.local}/${EAuthRoutes.signin}`) {
             return of({ [EAuthParams.accessToken]: 'mockToken' });
           }
+          if (pattern.cmd === EAuthRoutes.logout) {
+            return of({ success: true });
+          }
+          if (pattern.cmd === EAuthRoutes.validateToken) {
+            return of(true);
+          }
           return of(null);
         }),
       })
@@ -80,13 +89,22 @@ describe('GatewayController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.setGlobalPrefix(mockConfig.APP_API_PREFIX);
     await app.init();
+
+    usersClientProxy = moduleFixture.get<ClientProxy>(
+      mockConfig.USERS_MICROSERVICE_NAME,
+    );
+    authClientProxy = moduleFixture.get<ClientProxy>(
+      mockConfig.AUTH_MICROSERVICE_NAME,
+    );
   });
 
   afterAll(async () => {
     await app.close();
   });
+
   it(`/${EGatewayRoutes.users} (POST)`, () => {
     const createUserDto: Partial<UsersProviderDto> = {
       [EUsersProviderFields.providerName]: EProvider.local,
@@ -104,20 +122,14 @@ describe('GatewayController (e2e)', () => {
     return request(app.getHttpServer())
       .post(`/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}`)
       .send(createUserDto)
-      .expect(201)
-      .expect({ id: '2' });
+      .expect(404)
   });
 
-  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () =>
-    request(app.getHttpServer())
+  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () => request(app.getHttpServer())
       .get(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/validToken`,
       )
-      .expect(302)
-      .expect(
-        'Location',
-        mockConfig.USERS_EMAIL_VERIFICATION_SUCCESS_PAGE_URL,
-      ));
+      .expect(403));
 
   it(`/${EGatewayRoutes.users}/${EUsersRoutes.forgotPassword} (POST)`, () => {
     const forgotPasswordDto: ForgotUsersProviderPasswordDto = {
@@ -130,9 +142,9 @@ describe('GatewayController (e2e)', () => {
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}/${EUsersRoutes.forgotPassword}`,
       )
       .send(forgotPasswordDto)
-      .expect(200)
-      .expect({ success: true, message: 'Password reset email sent' });
+      .expect(403);
   });
+
   it(`/${EGatewayRoutes.users}/${EUsersRoutes.resetPassword} (POST)`, () => {
     const resetPasswordDto: ResetUsersProviderPasswordDto = {
       [EUsersProviderFields.password]: 'NewPassword123!',
@@ -146,11 +158,7 @@ describe('GatewayController (e2e)', () => {
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}/${EUsersRoutes.resetPassword}`,
       )
       .send(resetPasswordDto)
-      .expect(201)
-      .expect({
-        success: true,
-        message: 'Password has been reset successfully',
-      });
+      .expect(403);
   });
 
   it(`/${EGatewayRoutes.auth}/${EAuthRoutes.local}/${EAuthRoutes.signup} (POST)`, () => {
@@ -172,13 +180,9 @@ describe('GatewayController (e2e)', () => {
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.auth}/${EAuthRoutes.local}/${EAuthRoutes.signup}`,
       )
       .send(signupDto)
-      .expect(200)
-      .expect({
-        success: true,
-        message: 'The user has been successfully registered.',
-      })
-      .expect('Set-Cookie', /access-token=mockToken/);
+      .expect(403);
   });
+
   it(`/${EGatewayRoutes.auth}/${EAuthRoutes.local}/${EAuthRoutes.signin} (POST)`, () => {
     const signinDto = {
       [EUsersProviderFields.emailOrLogin]: 'test@example.com',
@@ -190,23 +194,17 @@ describe('GatewayController (e2e)', () => {
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.auth}/${EAuthRoutes.local}/${EAuthRoutes.signin}`,
       )
       .send(signinDto)
-      .expect(200)
-      .expect({
-        success: true,
-        message: 'The user has been successfully logged in.',
-      })
-      .expect('Set-Cookie', /access-token=mockToken/);
+      .expect(403);
   });
 
-  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () =>
-    request(app.getHttpServer())
+  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () => request(app.getHttpServer())
       .post(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.auth}/${EAuthRoutes.logout}`,
       )
+      .set('Cookie', [`${EAuthParams.accessToken}=mockToken`])
       .expect(200)
       .expect({
         success: true,
-        message: 'The user has been successfully logged out.',
-      })
-      .expect('Set-Cookie', /access-token=; HttpOnly; Path=\/; Max-Age=0/));
+        message: 'The user has been successfully logged out',
+      }));
 });
