@@ -78,18 +78,13 @@ export class AuthProxyController {
   @HttpCode(200)
   @Post(`${EAuthRoutes.local}/${EAuthRoutes.signup}`)
   async localSignup(@Body() signupDto: UsersProviderDto) {
-    console.debug('localSignup 1')
     const result = await lastValueFrom(
       this.authClient.send(
         { cmd: `${EAuthRoutes.local}/${EAuthRoutes.signup}` },
         signupDto,
       ),
-    ).catch((error) => {
-        console.debug('localSignup 2')
-        console.debug(error)
-    })
-    console.debug('localSignup 3')
-    const registered = !!result[EAuthParams.accessToken];
+    );
+    const registered = !!result?.[EAuthParams.accessToken];
 
     return {
       success: registered,
