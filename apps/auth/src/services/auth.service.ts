@@ -46,8 +46,11 @@ export class AuthService {
         { cmd: EUsersRoutes.createUser },
         { ...signupDto, [EUsersProviderFields.providerName]: EProvider.local },
       ),
-    );
-    console.debug('localSignup service 2')
+    ).catch((error) => {
+        console.debug('localSignup service 2')
+        console.log(error)
+    })
+    console.debug('localSignup service 3')
     return this.generateLocalAuthResponse(newUser, EProvider.local, true);
   }
 
