@@ -46,6 +46,7 @@ export class UsersController {
 
   @MessagePattern({ cmd: EUsersRoutes.createUser })
   async create(@Payload() userProviderData: UsersProviderDto) {
+    console.debug('create users controller 1')
     try {
       const createUsersProviderCommand = new CreateUsersProviderCommand(
         userProviderData[EUsersProviderFields.providerName],
@@ -58,9 +59,11 @@ export class UsersController {
         userProviderData[EUsersProviderFields.avatar],
         userProviderData[EUsersProviderFields.emailIsValidated],
       );
-
+      console.debug('create users controller 2')
       return await this.usersService.create(createUsersProviderCommand);
     } catch (error) {
+        console.debug('create users controller 3')
+        console.log(error)
       throw new RpcException(AppRpcErrorFormatter.format(error));
     }
   }

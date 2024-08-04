@@ -18,11 +18,8 @@ export class AuthController {
   @MessagePattern({ cmd: `${EAuthRoutes.local}/${EAuthRoutes.signup}` })
   async localSignup(@Payload() signupDto: UsersProviderDto) {
     try {
-      console.debug('localSignup controller 1');
       return await this.authService.localSignup(signupDto);
     } catch (error) {
-      console.debug(error);
-      console.debug('localSignup controller 2');
       throw new RpcException(AppRpcErrorFormatter.format(error));
     }
   }
@@ -32,16 +29,12 @@ export class AuthController {
     @Payload()
     signinDto: SigninDto,
   ) {
-    console.debug('localSignin controller 1');
-    console.debug(signinDto, 'signinDto');
     try {
       return await this.authService.localSignin(
         signinDto[EUsersProviderFields.emailOrLogin],
         signinDto[EUsersProviderFields.password],
       );
     } catch (error) {
-      console.debug('localSignin controller 2');
-      console.debug(error);
       throw new RpcException(AppRpcErrorFormatter.format(error));
     }
   }
