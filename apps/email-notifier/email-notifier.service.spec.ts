@@ -34,6 +34,7 @@ describe('EmailNotifierService', () => {
       to: 'test@example.com',
       subject: 'Test Subject',
       template: 'test-template',
+      html: '<body></body>',
       context: { key: 'value' },
     };
 
@@ -42,30 +43,35 @@ describe('EmailNotifierService', () => {
     expect(sendMailSpy).toHaveBeenCalledWith({
       to: mailOptions.to,
       subject: mailOptions.subject,
+      html: mailOptions.html,
       template: mailOptions.template,
-      context: mailOptions.context,
     });
   });
 
   it('should throw an error if emailNotifierService.sendMail fails', async () => {
-    const sendMailSpy = jest.spyOn(mailerService, 'sendMail').mockImplementation(() => {
-      throw new Error('Failed to send email');
-    });
+    const sendMailSpy = jest
+      .spyOn(mailerService, 'sendMail')
+      .mockImplementation(() => {
+        throw new Error('Failed to send email');
+      });
 
     const mailOptions = {
       to: 'test@example.com',
       subject: 'Test Subject',
       template: 'test-template',
+      html: '<body></body>',
       context: { key: 'value' },
     };
 
-    await expect(service.sendMail(mailOptions)).rejects.toThrow('Failed to send email');
+    await expect(service.sendMail(mailOptions)).rejects.toThrow(
+      'Failed to send email',
+    );
 
     expect(sendMailSpy).toHaveBeenCalledWith({
       to: mailOptions.to,
       subject: mailOptions.subject,
+      html: mailOptions.html,
       template: mailOptions.template,
-      context: mailOptions.context,
     });
   });
 
@@ -74,10 +80,13 @@ describe('EmailNotifierService', () => {
       to: '',
       subject: 'Test Subject',
       template: 'test-template',
+      html: '<body></body>',
       context: { key: 'value' },
     };
 
-    await expect(service.sendMail(mailOptions)).rejects.toThrow('Email recipient "to" is required');
+    await expect(service.sendMail(mailOptions)).rejects.toThrow(
+      'Email recipient "to" is required',
+    );
   });
 
   it('should throw an error if "subject" is not provided', async () => {
@@ -85,21 +94,27 @@ describe('EmailNotifierService', () => {
       to: 'test@example.com',
       subject: '',
       template: 'test-template',
+      html: '<body></body>',
       context: { key: 'value' },
     };
 
-    await expect(service.sendMail(mailOptions)).rejects.toThrow('Email subject is required');
+    await expect(service.sendMail(mailOptions)).rejects.toThrow(
+      'Email subject is required',
+    );
   });
 
-  it('should throw an error if "template" is not provided', async () => {
+  it('should throw an error if both "template" and "html" are not provided', async () => {
     const mailOptions = {
       to: 'test@example.com',
       subject: 'Test Subject',
       template: '',
+      html: '',
       context: { key: 'value' },
     };
 
-    await expect(service.sendMail(mailOptions)).rejects.toThrow('Email template is required');
+    await expect(service.sendMail(mailOptions)).rejects.toThrow(
+      'Email body is required',
+    );
   });
 
   it('should handle empty context', async () => {
@@ -109,6 +124,7 @@ describe('EmailNotifierService', () => {
       to: 'test@example.com',
       subject: 'Test Subject',
       template: 'test-template',
+      html: '<body></body>',
       context: {},
     };
 
@@ -117,8 +133,8 @@ describe('EmailNotifierService', () => {
     expect(sendMailSpy).toHaveBeenCalledWith({
       to: mailOptions.to,
       subject: mailOptions.subject,
+      html: mailOptions.html,
       template: mailOptions.template,
-      context: {},
     });
   });
 });

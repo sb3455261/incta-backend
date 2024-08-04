@@ -26,6 +26,7 @@ import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { EmailNotifierService } from '../../../email-notifier/email-notifier.service';
 import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
 import { UserFactory } from '../domain/factories/user.factory';
 import { CreateUserCommand } from './commands/create-user.command';
@@ -51,6 +52,7 @@ export class UsersService {
     private readonly jwtService: JwtService,
     @Inject(config.AUTH_MICROSERVICE_NAME)
     private readonly authClient: ClientProxy,
+    private readonly emailNotifierService: EmailNotifierService,
   ) {}
 
   // RETURNS PASSWORD & EMAIL
@@ -345,15 +347,29 @@ export class UsersService {
   }
 
   // TODO<
-  private async addEMailToQueue(email: string, message: string): Promise<any> {
+  private async addEMailToQueue(
+    email: string,
+    message: string,
+    subject: string,
+  ): Promise<any> {
     // TODO
     // add email to queue
-
-    console.debug('');
-    console.debug('addEMailToQueue');
-    console.debug(email, 'email');
-    console.debug(message, 'message');
-    console.debug('');
+    await this.emailNotifierService
+      .sendMail({
+        to: email,
+        subject,
+        html: `<html><body>${message}</body></html>`,
+      })
+      .then(() => {
+        console.debug('');
+        console.debug(`addEMailToQueue email to: ${email} has been sent `);
+      })
+      .catch((error) => {
+        console.debug('');
+        console.debug(
+          `addEMailToQueue email to: ${email} has NOT been sent , error: ${error.message}`,
+        );
+      });
   }
 
   private async sendVerificationEmailToVerifyProviderEmail(
@@ -366,12 +382,12 @@ export class UsersService {
     const message = `
         <div>Please follow this link to verify your email address</div>
         <div>
-            <a href="${url}">Verify email</a>
+            <a href="${url}" target="_blank">Verify email</a>
         </div>
         <div>Current time is: ${Date.now()}</div>
         <div>The link validity expires at ${Date.now() + this.appConfig.USERS_EMAIL_CONFIRMATION_TTL}</div>
     `;
-    await this.addEMailToQueue(email, message);
+    await this.addEMailToQueue(email, message, 'verify your email');
   }
 
   private async sendResetPasswordEmail(
@@ -383,19 +399,19 @@ export class UsersService {
     const message = `
         <div>Please follow this link to reset your password</div>
         <div>
-            <a href="${url}">Reset password</a>
+            <a href="${url}" target="_blank">Reset password</a>
         </div>
         <div>Current time is: ${Date.now()}</div>
         <div>Please copmplet your password recovery before: ${Date.now() + this.appConfig.USERS_PASSWORD_RESET_TOKEN_TTL / 1000} </div>
     `;
-    await this.addEMailToQueue(email, message);
+    await this.addEMailToQueue(email, message, 'reset your password');
   }
 
   private async sendPasswordWasChangedEmail(email: string): Promise<void> {
     const message = `
         <div>Your password was succesfully changed.</div>
     `;
-    await this.addEMailToQueue(email, message);
+    await this.addEMailToQueue(email, message, 'password changed');
   }
   // TODO/>
 

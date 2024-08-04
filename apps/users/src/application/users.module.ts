@@ -3,9 +3,11 @@ import { CqrsModule } from '@nestjs/cqrs';
 import {
   appConfig,
   AppConfigModule,
+  BcryptService,
   TAppConfig,
 } from '@app/shared';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { JwtService } from '@nestjs/jwt';
 import { UsersService } from './users.service';
 import { UsersController } from '../presenters/tcp/users.controller';
 import {
@@ -53,6 +55,8 @@ export class UsersModule {
       ],
       controllers: [UsersController],
       providers: [
+        JwtService,
+        BcryptService,
         EmailNotifierService,
         UsersService,
         UserFactory,

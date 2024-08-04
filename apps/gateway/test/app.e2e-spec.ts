@@ -108,12 +108,16 @@ describe('GatewayController (e2e)', () => {
       .expect({ id: '2' });
   });
 
-  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () => request(app.getHttpServer())
+  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () =>
+    request(app.getHttpServer())
       .get(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/validToken`,
       )
       .expect(302)
-      .expect('Location', mockConfig.USERS_EMAIL_VERIFICATION_SUCCESS_PAGE_URL));
+      .expect(
+        'Location',
+        mockConfig.USERS_EMAIL_VERIFICATION_SUCCESS_PAGE_URL,
+      ));
 
   it(`/${EGatewayRoutes.users}/${EUsersRoutes.forgotPassword} (POST)`, () => {
     const forgotPasswordDto: ForgotUsersProviderPasswordDto = {
@@ -194,7 +198,8 @@ describe('GatewayController (e2e)', () => {
       .expect('Set-Cookie', /access-token=mockToken/);
   });
 
-  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () => request(app.getHttpServer())
+  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () =>
+    request(app.getHttpServer())
       .post(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.auth}/${EAuthRoutes.logout}`,
       )

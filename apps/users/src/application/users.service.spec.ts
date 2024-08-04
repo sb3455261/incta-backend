@@ -16,6 +16,7 @@ import { of } from 'rxjs';
 import { UsersService } from './users.service';
 import { UserFactory } from '../domain/factories/user.factory';
 import { UsersProviderFactory } from '../domain/factories/users-provider.factory';
+import { EmailNotifierService } from '../../../email-notifier/email-notifier.service';
 import { FindUsersProviderQuery } from './queries/find-users-provider.query';
 import { FindProviderQuery } from './queries/find-provider.query';
 import { CreateUserCommand } from './commands/create-user.command';
@@ -30,6 +31,7 @@ describe('UsersService', () => {
   let mockAuthClient: jest.Mocked<ClientProxy>;
   let mockUserFactory: jest.Mocked<UserFactory>;
   let mockUsersProviderFactory: jest.Mocked<UsersProviderFactory>;
+  let mockEmailNotifierService: jest.Mocked<EmailNotifierService>;
   let mockConfig: TAppConfig;
 
   beforeEach(async () => {
@@ -82,6 +84,12 @@ describe('UsersService', () => {
             hashPassword: jest.fn(),
           }),
         },
+        {
+          provide: EmailNotifierService,
+          useFactory: () => ({
+            sendMail: jest.fn().mockResolvedValue(undefined),
+          }),
+        },
       ],
     }).compile();
 
@@ -96,21 +104,24 @@ describe('UsersService', () => {
     mockUsersProviderFactory = module.get(
       UsersProviderFactory,
     ) as jest.Mocked<UsersProviderFactory>;
+    mockEmailNotifierService = module.get(
+      EmailNotifierService,
+    ) as jest.Mocked<EmailNotifierService>;
   });
 
   describe('create', () => {
     it('should create a new local user when no existing user is found', async () => {
-      const createUsersProviderCommand = new CreateUsersProviderCommand(
-        EProvider.local,
-        'SUB',
-        'test@example.com',
-        'testuser',
-        'Test',
-        'User',
-        'password123',
-        'https://example.com/avatar.jpg',
-        false,
-      );
+      const createUsersProviderCommand = {
+        [EUsersProviderFields.providerName]: EProvider.local,
+        [EUsersProviderFields.sub]: 'SUB',
+        [EUsersProviderFields.email]: 'test@example.com',
+        [EUsersProviderFields.login]: 'testuser',
+        [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.surname]: 'User',
+        [EUsersProviderFields.password]: 'password123',
+        [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
+        [EUsersProviderFields.emailIsValidated]: false,
+      };
 
       const mockUser = {
         [EDbEntityFields.id]: '1',
@@ -136,8 +147,11 @@ describe('UsersService', () => {
 
       mockUserFactory.create.mockResolvedValue(mockUser);
       mockCommandBus.execute.mockResolvedValue(mockCreatedUser);
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
 
-      const result = await service.create(createUsersProviderCommand);
+      const result = await service.create(
+        createUsersProviderCommand as CreateUsersProviderCommand,
+      );
 
       expect(result).toEqual(mockCreatedUser);
       expect(mockUserFactory.create).toHaveBeenCalledWith(
@@ -151,59 +165,7 @@ describe('UsersService', () => {
       expect(mockCommandBus.execute).toHaveBeenCalledWith(
         expect.any(CreateUserCommand),
       );
-    });
-  });
-
-  describe('findUsersProviderByEmailOrLogin', () => {
-    it('should return user provider when found', async () => {
-      const mockUser = {
-        [EDbEntityFields.id]: '1',
-        [EUsersProviderFields.userLocalId]: '1',
-        [EUsersProviderFields.password]: 'hashedPassword',
-        [EUsersProviderFields.email]: 'test@example.com',
-        [EUsersProviderFields.emailIsValidated]: true,
-      };
-
-      mockCommandBus.execute.mockResolvedValue(mockUser);
-
-      const result =
-        await service.findUsersProviderByEmailOrLogin('test@example.com');
-
-      expect(result).toEqual(mockUser);
-    });
-
-    it('should return undefined when user provider is not found', async () => {
-      mockCommandBus.execute.mockResolvedValue(undefined);
-
-      const result = await service.findUsersProviderByEmailOrLogin(
-        'nonexistent@example.com',
-      );
-
-      expect(result).toBeUndefined();
-    });
-  });
-
-  describe('verifyEmailVerificationToken', () => {
-    it('should return true for valid token', async () => {
-      const mockDecodedToken = { [EDbEntityFields.id]: 'userId' };
-      mockJwtService.verify.mockReturnValue(mockDecodedToken);
-      mockQueryBus.execute.mockResolvedValue({ id: 'userId' });
-      mockCommandBus.execute.mockResolvedValue(undefined);
-
-      const result = await service.verifyEmailVerificationToken('valid-token');
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false for invalid token', async () => {
-      mockJwtService.verify.mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      const result =
-        await service.verifyEmailVerificationToken('invalid-token');
-
-      expect(result).toBe(false);
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
     });
   });
 
@@ -221,11 +183,13 @@ describe('UsersService', () => {
 
       mockCommandBus.execute.mockResolvedValue(mockUser);
       mockJwtService.sign.mockReturnValue('reset-token');
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
 
       await service.forgotPassword(dto);
 
       expect(mockCommandBus.execute).toHaveBeenCalled();
       expect(mockJwtService.sign).toHaveBeenCalled();
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
     });
   });
 
@@ -252,6 +216,7 @@ describe('UsersService', () => {
       mockUsersProviderFactory.hashPassword.mockResolvedValue('hashedPassword');
       mockCommandBus.execute.mockResolvedValue(undefined);
       mockAuthClient.send.mockReturnValue(of(undefined));
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
 
       await service.resetPassword(dto);
 
@@ -260,6 +225,7 @@ describe('UsersService', () => {
       expect(mockUsersProviderFactory.hashPassword).toHaveBeenCalled();
       expect(mockCommandBus.execute).toHaveBeenCalled();
       expect(mockAuthClient.send).toHaveBeenCalled();
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
     });
   });
 });

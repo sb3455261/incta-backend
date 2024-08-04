@@ -6,22 +6,21 @@ export class EmailNotifierService {
   constructor(private readonly mailerService: MailerService) {}
 
   async sendMail(options: ISendMailOptions) {
-    const {to, subject, template, html} = options
+    const { to, subject, template, html } = options;
     if (!to) {
       throw new Error('Email recipient "to" is required');
     }
     if (!subject) {
       throw new Error('Email subject is required');
     }
-    if (!template && ! html) {
+    if (!template && !html) {
       throw new Error('Email body is required');
     }
-    const body = template ? {template} : {html}
     await this.mailerService.sendMail({
-        to: options.to,
-        subject: options.subject,
-        ...{body},
-        context: options.context,
+      to,
+      subject,
+      html,
+      template,
     });
   }
 }

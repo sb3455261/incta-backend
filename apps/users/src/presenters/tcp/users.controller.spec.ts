@@ -16,6 +16,7 @@ import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
 import { UsersController } from './users.controller';
 import { UsersService } from '../../application/users.service';
 import { CreateUsersProviderCommand } from '../../application/commands/create-users-provider.command';
+import { EmailNotifierService } from '../../../../email-notifier/email-notifier.service';
 
 describe('UsersController', () => {
   let usersController: UsersController;
@@ -39,6 +40,12 @@ describe('UsersController', () => {
         {
           provide: appConfig.KEY,
           useValue: mockAppConfig,
+        },
+        {
+          provide: EmailNotifierService,
+          useValue: {
+            sendMail: jest.fn(),
+          },
         },
       ],
     }).compile();
