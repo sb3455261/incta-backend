@@ -40,12 +40,14 @@ export class AuthService {
   ) {}
 
   async localSignup(signupDto: UsersProviderDto): Promise<any> {
+    console.debug('localSignup service 1')
     const newUser = await firstValueFrom(
       this.usersClient.send(
         { cmd: EUsersRoutes.createUser },
         { ...signupDto, [EUsersProviderFields.providerName]: EProvider.local },
       ),
     );
+    console.debug('localSignup service 2')
     return this.generateLocalAuthResponse(newUser, EProvider.local, true);
   }
 
@@ -97,7 +99,7 @@ export class AuthService {
   ) {
     const deviceId = randomUUID();
     const token = this.generateToken(user.id, deviceId, providerName);
-
+    console.debug('localSignup service 3')
     if (!isSignUp) {
       await this.sessionService.createSession({
         _id: new Types.ObjectId(),
@@ -109,7 +111,7 @@ export class AuthService {
         isActive: true,
       });
     }
-
+    console.debug('localSignup service 4')
     return {
       [EAuthParams.accessToken]: token,
     };
