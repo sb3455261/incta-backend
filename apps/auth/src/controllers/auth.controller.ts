@@ -35,6 +35,7 @@ export class AuthController {
         signinDto[EUsersProviderFields.password],
       );
     } catch (error) {
+        console.debug(error)
       throw new RpcException(AppRpcErrorFormatter.format(error));
     }
   }
