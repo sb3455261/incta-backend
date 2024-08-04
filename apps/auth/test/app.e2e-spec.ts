@@ -19,7 +19,6 @@ describe('AuthController (e2e)', () => {
   let app: INestApplication;
   let authClientProxy: ClientProxy;
   let mockConfig: TAppConfig;
-  let moduleRef: TestingModule;
 
   beforeAll(async () => {
     mockConfig = createMockAppConfig();
@@ -66,7 +65,6 @@ describe('AuthController (e2e)', () => {
     authClientProxy = moduleFixture.get<ClientProxy>(
       mockConfig.AUTH_MICROSERVICE_NAME,
     );
-    moduleRef = moduleFixture;
   });
 
   afterAll(async () => {

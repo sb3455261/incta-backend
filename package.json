@@ -11,7 +11,7 @@
         "test:e2e:gateway": "jest --config ./apps/gateway/test/jest-e2e.json",
         "build:auth": "nest build auth",
         "start:auth": "nest start auth",
-        "test:e2e:auth": "jest --config ./apps/auth/test/jest-e2e.json --detectOpenHandles --runInBand --forceExit",
+        "test:e2e:auth": "jest --config ./apps/auth/test/jest-e2e.json --forceExit",
         "prisma:generate:users": "cd apps/users && prisma generate",
         "prisma:migrate:users": "prisma migrate deploy --schema=./apps/users/prisma/schema.prisma",
         "build:users": "sh set-env-prod.sh sh -c 'npm run prisma:generate:users && rm -rf dist/apps/users/prisma && mkdir -p dist/apps/users/prisma && cp -r apps/users/prisma/generated dist/apps/users/prisma/generated && npm run prisma:migrate:users && nest build users'",
