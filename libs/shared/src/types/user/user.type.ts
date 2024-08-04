@@ -1,4 +1,4 @@
-import { IDbEntity } from '../db-entity/db-entity.type';
+import { EDbEntityFields, IDbEntity } from '../db-entity/db-entity.type';
 
 export enum EUserFields {
   providers = 'providers',
@@ -33,6 +33,8 @@ export enum EUsersProviderFields {
   repeatPassword = 'repeatPassword',
   agreement = 'agreement',
   provider = 'provider',
+  emailOrLogin = 'email-or-login',
+  recaptchaToken = 'recaptcha-token',
 }
 export interface IUsersProvider extends IDbEntity {
   [EUsersProviderFields.userLocalId]?: IUser['id'];
@@ -46,3 +48,11 @@ export interface IUsersProvider extends IDbEntity {
   [EUsersProviderFields.avatar]?: string;
   [EUsersProviderFields.emailIsValidated]: boolean;
 }
+
+export type TFindUserByEmailOrLoginQueryHandlerReturnType = Record<
+  | EDbEntityFields.id
+  | EUsersProviderFields.userLocalId
+  | EUsersProviderFields.password
+  | EUsersProviderFields.email,
+  string
+> & { [EUsersProviderFields.emailIsValidated]: boolean };

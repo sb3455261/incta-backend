@@ -8,11 +8,14 @@ import { UsersProviderFactory } from './users-provider.factory';
 export class UserFactory {
   constructor(private readonly usersProviderFactory: UsersProviderFactory) {}
 
-  create(usersProvider: CreateUsersProviderCommand, id?: string): User {
+  async create(
+    usersProvider: CreateUsersProviderCommand,
+    id?: string,
+  ): Promise<User> {
     return User.create(
       id,
       usersProvider[EUsersProviderFields.providerName] as EProvider,
-      this.usersProviderFactory.create(
+      await this.usersProviderFactory.create(
         id,
         usersProvider[EUsersProviderFields.providerName] as EProvider,
         usersProvider,

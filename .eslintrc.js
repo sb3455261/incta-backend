@@ -20,10 +20,12 @@ module.exports = {
   },
   ignorePatterns: ['.eslintrc.js', '**/generated/**'],
   rules: {
+    "new-cap": "off",
+    "max-classes-per-file": "off",
     "func-names": [0, "never"],
     "import/prefer-default-export": "off",
     "class-methods-use-this": "off",
-    "import/no-extraneous-dependencies": ["error", {"devDependencies": true}],
+    "import/no-extraneous-dependencies": "off",
     "no-underscore-dangle":  "off",
     "no-console": ["error", { "allow": ["error", "info", "debug"] }],
     "no-unused-vars": "off",
