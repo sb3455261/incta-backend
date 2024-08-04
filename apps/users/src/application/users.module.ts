@@ -3,11 +3,9 @@ import { CqrsModule } from '@nestjs/cqrs';
 import {
   appConfig,
   AppConfigModule,
-  BcryptService,
   TAppConfig,
 } from '@app/shared';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { JwtService } from '@nestjs/jwt';
 import { UsersService } from './users.service';
 import { UsersController } from '../presenters/tcp/users.controller';
 import {
@@ -24,6 +22,8 @@ import { UpdateUsersProviderCommandHandler } from './commands/update-users-provi
 import { DeleteUserCommandHandler } from './commands/delete-user.command.handler';
 import { ConfirmUsersLocalProviderEmailCommandHandler } from './commands/confirm-users-local-provider-email-command.handler';
 import { FindUsersProviderByEmailOrLoginQueryHandler } from './queries/find-users-provider-by-email-or-login.query.handler';
+import { EmailNotifierModule } from '../../../email-notifier/email-notifier.module';
+import { EmailNotifierService } from '../../../email-notifier/email-notifier.service';
 
 const config = appConfig();
 
@@ -36,6 +36,7 @@ export class UsersModule {
         CqrsModule.forRoot(),
         AppConfigModule,
         UserInfrastructureModule.use(driver),
+        EmailNotifierModule,
         ClientsModule.registerAsync([
           {
             name: config.AUTH_MICROSERVICE_NAME,
@@ -52,8 +53,7 @@ export class UsersModule {
       ],
       controllers: [UsersController],
       providers: [
-        JwtService,
-        BcryptService,
+        EmailNotifierService,
         UsersService,
         UserFactory,
         UsersProviderFactory,
