@@ -1,5 +1,5 @@
 #!/bin/bash
-export NODE_ENV=production
+
 
 export AUTH_MONGODB_URI=mongodb+srv://sbbs8668:4FPZl4rvWmkbuEqZ@incta.l25thzz.mongodb.net
 export AUTH_JWT_SECRET=e9b7e1f3c8a5d2b6f0e4a7c1d8b3f6a2e5c9d7b0f4a2e8c6d1b3f7a9e0c5d2b4
