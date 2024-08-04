@@ -10,7 +10,7 @@ export const swagger = (app: any) => {
     .setDescription('API documentation for Incta Backend services')
     .setVersion(version)
     .addServer(
-      `https://${EGatewayRoutes.gateway}.incta.team/${config.APP_API_PREFIX}`,
+      `https://${EGatewayRoutes.gateway}.incta.team`,
       'Production server',
     )
     .addServer(
