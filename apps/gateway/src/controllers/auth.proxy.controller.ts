@@ -84,7 +84,7 @@ export class AuthProxyController {
         signupDto,
       ),
     );
-    const registered = !!result[EAuthParams.accessToken];
+    const registered = !!result?.[EAuthParams.accessToken];
 
     return {
       success: registered,
@@ -125,7 +125,11 @@ export class AuthProxyController {
       response.cookie(
         EAuthParams.accessToken,
         result[EAuthParams.accessToken],
-        { httpOnly: true, secure: process.env.NODE_ENV === 'production' },
+        {
+          domain: `.${this.config.APP_MAIN_DOMAIN}`,
+          httpOnly: true,
+          secure: this.config.NODE_ENV === 'production',
+        },
       );
     }
 

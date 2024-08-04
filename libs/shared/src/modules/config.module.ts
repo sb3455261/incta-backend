@@ -12,6 +12,7 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
 
   const configValues = {
     NODE_ENV: process.env.NODE_ENV,
+    APP_MAIN_DOMAIN: process.env.APP_MAIN_DOMAIN,
 
     SMTP_AUTHENTICATION_USERNAME: process.env.SMTP_AUTHENTICATION_USERNAME,
     SMTP_AUTHENTICATION_PASSWORD: process.env.SMTP_AUTHENTICATION_PASSWORD,
@@ -60,6 +61,7 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
 
   const schema = Joi.object<typeof configValues>({
     NODE_ENV: Joi.string().valid('development', 'production').required(),
+    APP_MAIN_DOMAIN: Joi.string().required(),
     SMTP_AUTHENTICATION_USERNAME: Joi.string().required(),
     SMTP_AUTHENTICATION_PASSWORD: Joi.string().required(),
     SMTP_SERVER_HOST: Joi.string().required(),

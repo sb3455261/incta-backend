@@ -25,7 +25,7 @@ export class Session {
   isActive: boolean;
 
   @Prop({ required: true, enum: EProvider })
-  providerName: EProvider;
+  providerName: string;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

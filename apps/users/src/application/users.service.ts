@@ -82,7 +82,6 @@ export class UsersService {
     );
     user.setProviderLocalId(provider.id);
     const newUsersProvider = user.getUsersProvider();
-
     if (user.isLocalProvider()) {
       return this.createUserWithUsersLocalProviderOrUpdateUsersLocalProvider(
         user,

@@ -97,7 +97,6 @@ export class AuthService {
   ) {
     const deviceId = randomUUID();
     const token = this.generateToken(user.id, deviceId, providerName);
-
     if (!isSignUp) {
       await this.sessionService.createSession({
         _id: new Types.ObjectId(),
@@ -109,7 +108,6 @@ export class AuthService {
         isActive: true,
       });
     }
-
     return {
       [EAuthParams.accessToken]: token,
     };

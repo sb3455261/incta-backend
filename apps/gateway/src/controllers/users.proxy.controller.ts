@@ -83,7 +83,7 @@ export class UsersProxyController {
       }
       if (result && result.success === false) {
         return response.redirect(
-          401,
+          302,
           this.config.USERS_EMAIL_VERIFICATION_ERROR_PAGE_URL,
         );
       }

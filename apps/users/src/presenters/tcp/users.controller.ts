@@ -58,7 +58,6 @@ export class UsersController {
         userProviderData[EUsersProviderFields.avatar],
         userProviderData[EUsersProviderFields.emailIsValidated],
       );
-
       return await this.usersService.create(createUsersProviderCommand);
     } catch (error) {
       throw new RpcException(AppRpcErrorFormatter.format(error));

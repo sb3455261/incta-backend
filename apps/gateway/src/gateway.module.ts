@@ -31,10 +31,7 @@ const config = appConfig();
         useFactory: async (_appConfig: TAppConfig) => ({
           transport: Transport.TCP,
           options: {
-            host:
-              process.env.NODE_ENV === 'development'
-                ? undefined
-                : _appConfig.AUTH_MICROSERVICE_HOST,
+            host: _appConfig.AUTH_MICROSERVICE_HOST,
             port: _appConfig.AUTH_MICROSERVICE_PORT,
           },
         }),

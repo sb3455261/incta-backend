@@ -1,7 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { ClientProxy, ClientsModule, Transport } from '@nestjs/microservices';
-import { of , lastValueFrom } from 'rxjs';
 import {
   EAuthRoutes,
   EProvider,
@@ -13,60 +11,47 @@ import {
   EAuthParams,
 } from '@app/shared';
 import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
-import { AuthModule } from '../src/modules/auth.module';
+import { AuthController } from '../src/controllers/auth.controller';
+import { AuthService } from '../src/services/auth.service';
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
-  let authClientProxy: ClientProxy;
+  let authController: AuthController;
   let mockConfig: TAppConfig;
-  let moduleRef: TestingModule;
 
   beforeAll(async () => {
     mockConfig = createMockAppConfig();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [
-        AuthModule,
-        ClientsModule.register([
-          {
-            name: mockConfig.AUTH_MICROSERVICE_NAME,
-            transport: Transport.TCP,
+      controllers: [AuthController],
+      providers: [
+        {
+          provide: AuthService,
+          useValue: {
+            localSignup: jest
+              .fn()
+              .mockResolvedValue({ [EAuthParams.accessToken]: 'mockToken' }),
+            localSignin: jest
+              .fn()
+              .mockResolvedValue({ [EAuthParams.accessToken]: 'mockToken' }),
+            logout: jest.fn().mockResolvedValue({ success: true }),
+            validateToken: jest.fn().mockResolvedValue(true),
+            rotateToken: jest
+              .fn()
+              .mockResolvedValue({ [EAuthParams.accessToken]: 'newMockToken' }),
           },
-        ]),
+        },
+        {
+          provide: appConfig.KEY,
+          useValue: mockConfig,
+        },
       ],
-    })
-      .overrideProvider(mockConfig.AUTH_MICROSERVICE_NAME)
-      .useValue({
-        send: jest.fn((pattern) => {
-          if (pattern.cmd === `${EAuthRoutes.local}/${EAuthRoutes.signup}`) {
-            return of({ [EAuthParams.accessToken]: 'mockToken' });
-          }
-          if (pattern.cmd === `${EAuthRoutes.local}/${EAuthRoutes.signin}`) {
-            return of({ [EAuthParams.accessToken]: 'mockToken' });
-          }
-          if (pattern.cmd === EAuthRoutes.logout) {
-            return of({ success: true });
-          }
-          if (pattern.cmd === EAuthRoutes.validateToken) {
-            return of(true);
-          }
-          if (pattern.cmd === EAuthRoutes.rotateToken) {
-            return of({ [EAuthParams.accessToken]: 'newMockToken' });
-          }
-          return of(null);
-        }),
-      })
-      .overrideProvider(appConfig.KEY)
-      .useValue(mockConfig)
-      .compile();
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
 
-    authClientProxy = moduleFixture.get<ClientProxy>(
-      mockConfig.AUTH_MICROSERVICE_NAME,
-    );
-    moduleRef = moduleFixture;
+    authController = moduleFixture.get<AuthController>(AuthController);
   });
 
   afterAll(async () => {
@@ -83,14 +68,11 @@ describe('AuthController (e2e)', () => {
       [EUsersProviderFields.agreement]: 'agreed',
     };
 
-    const response = await lastValueFrom(
-      authClientProxy.send(
-        { cmd: `${EAuthRoutes.local}/${EAuthRoutes.signup}` },
-        signupDto,
-      ),
+    const result = await authController.localSignup(
+      signupDto as UsersProviderDto,
     );
-    expect(response).toHaveProperty(EAuthParams.accessToken);
-    expect(response[EAuthParams.accessToken]).toBe('mockToken');
+    expect(result).toHaveProperty(EAuthParams.accessToken);
+    expect(result[EAuthParams.accessToken]).toBe('mockToken');
   });
 
   it(`/${EAuthRoutes.local}/${EAuthRoutes.signin} (POST)`, async () => {
@@ -99,41 +81,27 @@ describe('AuthController (e2e)', () => {
       [EUsersProviderFields.password]: 'Password123!',
     };
 
-    const response = await lastValueFrom(
-      authClientProxy.send(
-        { cmd: `${EAuthRoutes.local}/${EAuthRoutes.signin}` },
-        signinDto,
-      ),
-    );
-    expect(response).toHaveProperty(EAuthParams.accessToken);
-    expect(response[EAuthParams.accessToken]).toBe('mockToken');
+    const result = await authController.localSignin(signinDto);
+    expect(result).toHaveProperty(EAuthParams.accessToken);
+    expect(result[EAuthParams.accessToken]).toBe('mockToken');
   });
 
   it(`/${EAuthRoutes.logout} (POST)`, async () => {
     const token = 'mockToken';
-
-    const response = await lastValueFrom(
-      authClientProxy.send({ cmd: EAuthRoutes.logout }, token),
-    );
-    expect(response.success).toBe(true);
+    const result = await authController.logout(token);
+    expect(result).toEqual({ success: true, message: 'Logout successful' });
   });
 
   it(`/${EAuthRoutes.validateToken} (POST)`, async () => {
     const token = 'mockToken';
-
-    const response = await lastValueFrom(
-      authClientProxy.send({ cmd: EAuthRoutes.validateToken }, token),
-    );
-    expect(response).toBe(true);
+    const result = await authController.validateToken(token);
+    expect(result).toBeTruthy();
   });
 
   it(`/${EAuthRoutes.rotateToken} (POST)`, async () => {
     const token = 'mockToken';
-
-    const response = await lastValueFrom(
-      authClientProxy.send({ cmd: EAuthRoutes.rotateToken }, token),
-    );
-    expect(response).toHaveProperty(EAuthParams.accessToken);
-    expect(response[EAuthParams.accessToken]).toBe('newMockToken');
+    const result = await authController.refreshToken(token);
+    expect(result).toHaveProperty(EAuthParams.accessToken);
+    expect(result[EAuthParams.accessToken]).toBe('newMockToken');
   });
 });

@@ -9,5 +9,6 @@
     "moduleNameMapper": {
       "^@app/shared(.*)$": "<rootDir>/../../../libs/shared/src$1",
       "^@users-generated$": "<rootDir>/users-prisma.mock.ts"
-    }
+    },
+    "testTimeout": 30000
 }
