@@ -122,10 +122,11 @@ describe('GatewayController (e2e)', () => {
     return request(app.getHttpServer())
       .post(`/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}`)
       .send(createUserDto)
-      .expect(404)
+      .expect(404);
   });
 
-  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () => request(app.getHttpServer())
+  it(`/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/:token (GET)`, () =>
+    request(app.getHttpServer())
       .get(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/validToken`,
       )
@@ -197,7 +198,8 @@ describe('GatewayController (e2e)', () => {
       .expect(403);
   });
 
-  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () => request(app.getHttpServer())
+  it(`/${EGatewayRoutes.auth}/${EAuthRoutes.logout} (POST)`, () =>
+    request(app.getHttpServer())
       .post(
         `/${mockConfig.APP_API_PREFIX}/${EGatewayRoutes.auth}/${EAuthRoutes.logout}`,
       )
