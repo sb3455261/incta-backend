@@ -35,8 +35,7 @@ export class UsersProviderFactory {
       | EUsersProviderFields.providerLocalId
     >
   > {
-    console.debug('mapCommandToProviderData 1');
-    const result = {
+    return {
       [EUsersProviderFields.sub]: data[EUsersProviderFields.sub],
       [EUsersProviderFields.email]: data[EUsersProviderFields.email],
       [EUsersProviderFields.login]: data[EUsersProviderFields.login],
@@ -49,8 +48,6 @@ export class UsersProviderFactory {
       [EUsersProviderFields.emailIsValidated]:
         data[EUsersProviderFields.providerName] !== EProvider.local,
     };
-    console.debug('mapCommandToProviderData 2');
-    return result;
   }
 
   async hashPassword(password: string) {

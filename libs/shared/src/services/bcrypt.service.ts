@@ -10,7 +10,10 @@ export abstract class HashPasswordService {
 @Injectable()
 export class BcryptService implements HashPasswordService {
   async hash(rawPassword: string | Buffer): Promise<string> {
-    return hash(rawPassword, await genSalt());
+    console.debug('BcryptService 1', rawPassword, 'rawPassword');
+    const _hash = await hash(rawPassword, await genSalt());
+    console.debug('BcryptService 2', _hash, '_hash');
+    return _hash
   }
 
   async compare(
