@@ -18,10 +18,6 @@ describe('AuthController', () => {
   let authService: jest.Mocked<AuthService>;
   let mockConfig: TAppConfig;
 
-  afterAll(async () => {
-    jest.clearAllMocks();
-  });
-
   beforeEach(async () => {
     mockConfig = createMockAppConfig();
 
@@ -53,7 +49,7 @@ describe('AuthController', () => {
 
   describe('localSignup', () => {
     it('should call authService.localSignup and return the result', async () => {
-      const signupDto: Partial<UsersProviderDto> = {
+      const signupDto: UsersProviderDto = {
         [EUsersProviderFields.providerName]: EProvider.local,
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
@@ -64,21 +60,20 @@ describe('AuthController', () => {
         [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
+        [EUsersProviderFields.sub]: 'localSubId',
       };
 
       const mockResult = { accessToken: 'token' };
       authService.localSignup.mockResolvedValue(mockResult);
 
-      const result = await controller.localSignup(
-        signupDto as Required<typeof signupDto>,
-      );
+      const result = await controller.localSignup(signupDto);
 
       expect(authService.localSignup).toHaveBeenCalledWith(signupDto);
       expect(result).toEqual(mockResult);
     });
 
     it('should throw RpcException when authService.localSignup throws an error', async () => {
-      const signupDto: Partial<UsersProviderDto> = {
+      const signupDto: UsersProviderDto = {
         [EUsersProviderFields.providerName]: EProvider.local,
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
@@ -89,13 +84,14 @@ describe('AuthController', () => {
         [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
+        [EUsersProviderFields.sub]: 'localSubId',
       };
 
       authService.localSignup.mockRejectedValue(new Error('Signup failed'));
 
-      await expect(
-        controller.localSignup(signupDto as Required<typeof signupDto>),
-      ).rejects.toThrow(RpcException);
+      await expect(controller.localSignup(signupDto)).rejects.toThrow(
+        RpcException,
+      );
     });
   });
 
@@ -133,11 +129,48 @@ describe('AuthController', () => {
   });
 
   describe('externalSignin', () => {
-    it('should throw NotImplementedException', async () => {
-      const data = {
-        provider: EProvider.google,
+    it('should call authService.externalSignin and return the result', async () => {
+      const data: UsersProviderDto = {
+        [EUsersProviderFields.providerName]: EProvider.google,
+        [EUsersProviderFields.sub]: 'googleSubId',
+        [EUsersProviderFields.email]: 'test@example.com',
+        [EUsersProviderFields.login]: 'test@example.com:google',
+        [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.surname]: 'User',
+        [EUsersProviderFields.password]: 'randomPassword',
         [EUsersProviderFields.agreement]: 'agreed',
+        [EUsersProviderFields.emailIsValidated]: true,
+        [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
+        [EUsersProviderFields.repeatPassword]: 'randomPassword',
       };
+
+      const mockResult = { accessToken: 'token' };
+      authService.externalSignin.mockResolvedValue(mockResult);
+
+      const result = await controller.externalSignin(data);
+
+      expect(authService.externalSignin).toHaveBeenCalledWith(data);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should throw RpcException when authService.externalSignin throws an error', async () => {
+      const data: UsersProviderDto = {
+        [EUsersProviderFields.providerName]: EProvider.google,
+        [EUsersProviderFields.sub]: 'googleSubId',
+        [EUsersProviderFields.email]: 'test@example.com',
+        [EUsersProviderFields.login]: 'test@example.com:google',
+        [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.surname]: 'User',
+        [EUsersProviderFields.password]: 'randomPassword',
+        [EUsersProviderFields.agreement]: 'agreed',
+        [EUsersProviderFields.emailIsValidated]: true,
+        [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
+        [EUsersProviderFields.repeatPassword]: 'randomPassword',
+      };
+
+      authService.externalSignin.mockRejectedValue(
+        new Error('External signin failed'),
+      );
 
       await expect(controller.externalSignin(data)).rejects.toThrow(
         RpcException,

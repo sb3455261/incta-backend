@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigType, registerAs } from '@nestjs/config';
 import * as Joi from 'joi';
 import * as dotenv from 'dotenv';
+import { EAuthRoutes } from '../routes/auth.routes';
+import { EProvider } from '../types/user/user.type';
 
 dotenv.config({ path: './.env' });
 
@@ -37,6 +39,17 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     AUTH_SESSION_MODEL: 'AUTH-SESSION-MODEL',
     AUTH_TOKEN_EXPIRATION: 3600,
     AUTH_SESSION_INACTIVITY_PERIOD: +process.env.AUTH_SESSION_INACTIVITY_PERIOD,
+    AUTH_GOOGLE_CALLBACK_URL: isDevelopment
+      ? `http://localhost:${+process.env.GATEWAY_MICROSERVICE_PORT}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`
+      : `https://${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`,
+    AUTH_GOOGLE_CLIENT_ID: process.env.AUTH_GOOGLE_CLIENT_ID,
+    AUTH_GOOGLE_CLIENT_SECRET: process.env.AUTH_GOOGLE_CLIENT_SECRET,
+    AUTH_GITHUB_CALLBACK_URL: isDevelopment
+      ? `http://localhost:${+process.env.GATEWAY_MICROSERVICE_PORT}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`
+      : `https://${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`,
+    AUTH_GITHUB_CLIENT_ID: process.env.AUTH_GITHUB_CLIENT_ID,
+    AUTH_GITHUB_CLIENT_SECRET: process.env.AUTH_GITHUB_CLIENT_SECRET,
+
     USERS_MICROSERVICE_HOST: isDevelopment
       ? undefined
       : process.env.USERS_MICROSERVICE_HOST,
@@ -84,6 +97,13 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     AUTH_SESSION_MODEL: Joi.string().required(),
     AUTH_TOKEN_EXPIRATION: Joi.number().required(),
     AUTH_SESSION_INACTIVITY_PERIOD: Joi.number().required(),
+    AUTH_GOOGLE_CLIENT_ID: Joi.string().required(),
+    AUTH_GOOGLE_CLIENT_SECRET: Joi.string().required(),
+    AUTH_GOOGLE_CALLBACK_URL: Joi.string().required(),
+    AUTH_GITHUB_CALLBACK_URL: Joi.string().required(),
+    AUTH_GITHUB_CLIENT_ID: Joi.string().required(),
+    AUTH_GITHUB_CLIENT_SECRET: Joi.string().required(),
+
     USERS_MICROSERVICE_HOST: Joi.string().when('NODE_ENV', {
       is: 'production',
       then: Joi.required(),
