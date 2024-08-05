@@ -8,6 +8,7 @@ import {
   EUsersProviderFields,
   IUser,
   IUsersProvider,
+  TFindUserByEmailOrLoginQueryHandlerReturnType,
 } from '@app/shared';
 import { Prisma } from '@users-generated';
 import { UserRepository } from '../../../application/ports/user-abstract.repository';
@@ -19,18 +20,41 @@ export class PrismaUserRepository extends UserRepository {
     super();
   }
 
+  async findAll(): Promise<IUser[]> {
+    return this.prisma.user.findMany({
+      include: { [EUserFields.providers]: true },
+    });
+  }
+
+  async findProvider(
+    providerName: EProvider,
+  ): Promise<{ [EDbEntityFields.id]: string }> {
+    return this.prisma.provider.findFirstOrThrow({
+      where: {
+        [EProviderFields.name]: providerName,
+      },
+      select: { [EDbEntityFields.id]: true },
+    });
+  }
+
   async findUsersProvider(
     where: Partial<IUsersProvider>,
   ): Promise<IUsersProvider | null> {
-    const whereEntries = Object.entries(where);
-    const whereClause = whereEntries.length
-      ? Prisma.sql`WHERE ${Prisma.join(
-          whereEntries.map(
-            ([key, value]) =>
-              Prisma.sql`up.${Prisma.raw(`"${key}"`)} = ${value}`,
-          ),
-          ' AND ',
-        )}`
+    const allowedKeys = Object.values(EUsersProviderFields);
+
+    const whereEntries = Object.entries(where).filter(([key]) =>
+      allowedKeys.includes(key as EUsersProviderFields),
+    );
+    const whereConditions = whereEntries.map(
+      ([key, value]) => Prisma.sql`up.${Prisma.raw(`"${key}"`)} = ${value}`,
+    );
+
+    const providerLocalIdField = Prisma.raw(
+      `"${EUsersProviderFields.providerLocalId}"`,
+    );
+
+    const whereClause = whereConditions.length
+      ? Prisma.sql`WHERE ${Prisma.join(whereConditions, ' AND ')}`
       : Prisma.empty;
 
     const query = Prisma.sql`
@@ -43,20 +67,53 @@ export class PrismaUserRepository extends UserRepository {
           'updatedAt', p."updatedAt"
         ) as provider
       FROM "UsersProvider" up
-      JOIN "Provider" p ON up."providerLocalId" = p.id
+      JOIN "Provider" p ON up.${providerLocalIdField} = p.id
       ${whereClause}
       ORDER BY CASE WHEN p.name = ${EProvider.local} THEN 0 ELSE 1 END
       LIMIT 1
     `;
+
     const result = await this.prisma.$queryRaw<IUsersProvider[]>(query);
 
     return result[0] || null;
   }
 
-  async findAll(): Promise<IUser[]> {
-    return this.prisma.user.findMany({
-      include: { [EUserFields.providers]: true },
+  // RETURNS PASSWORD & EMAIL
+  async findLocalUsersProviderByEmailOrLogin(
+    emailOrLogin: string,
+  ): Promise<TFindUserByEmailOrLoginQueryHandlerReturnType | undefined> {
+    const result = await this.prisma.usersProvider.findFirst({
+      where: {
+        OR: [
+          { [EUsersProviderFields.email]: emailOrLogin },
+          { [EUsersProviderFields.login]: emailOrLogin },
+        ],
+        provider: {
+          name: EProvider.local,
+        },
+      },
+      include: {
+        user: true,
+      },
     });
+    if (!result) {
+      return undefined;
+    }
+    const {
+      user,
+      [EDbEntityFields.id]: id,
+      [EUsersProviderFields.password]: password,
+      [EUsersProviderFields.email]: email,
+      [EUsersProviderFields.emailIsValidated]: emailIsValidated,
+    } = result;
+
+    return {
+      [EUsersProviderFields.userLocalId]: user[EDbEntityFields.id],
+      [EDbEntityFields.id]: id,
+      [EUsersProviderFields.password]: password,
+      [EUsersProviderFields.email]: email,
+      [EUsersProviderFields.emailIsValidated]: emailIsValidated,
+    };
   }
 
   async create(user: User): Promise<Omit<IUser, EUserFields.providers>> {
@@ -91,21 +148,19 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  async update(id: string, data: Partial<IUsersProvider>): Promise<void> {
-    await this.prisma.usersProvider.update({
-      where: { [EDbEntityFields.id]: id },
-      data,
+  async confirmUsersLocalProviderEmail(providerId: string): Promise<void> {
+    await this.updateUsersProvider(providerId, {
+      [EUsersProviderFields.emailIsValidated]: true,
     });
   }
 
-  async findProvider(
-    providerName: EProvider,
-  ): Promise<{ [EDbEntityFields.id]: string }> {
-    return this.prisma.provider.findFirstOrThrow({
-      where: {
-        [EProviderFields.name]: providerName,
-      },
-      select: { [EDbEntityFields.id]: true },
+  async updateUsersProvider(
+    id: string,
+    data: Partial<IUsersProvider>,
+  ): Promise<void> {
+    await this.prisma.usersProvider.update({
+      where: { [EDbEntityFields.id]: id },
+      data,
     });
   }
 

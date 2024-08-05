@@ -1,45 +1,47 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { JwtService } from '@nestjs/jwt';
+import { ClientProxy } from '@nestjs/microservices';
 import {
   EDbEntityFields,
-  EUserFields,
   EUsersProviderFields,
   EProvider,
-  IUser,
   appConfig,
+  TAppConfig,
+  ForgotUsersProviderPasswordDto,
+  ResetUsersProviderPasswordDto,
+  EUsersParams,
 } from '@app/shared';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { createMockAppConfig } from '@app/shared/tests/mocks/app-config.mock';
+import { of } from 'rxjs';
 import { UsersService } from './users.service';
 import { UserFactory } from '../domain/factories/user.factory';
-import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
-import { User } from '../domain/user';
+import { UsersProviderFactory } from '../domain/factories/users-provider.factory';
+import { EmailNotifierService } from '../../../email-notifier/email-notifier.service';
 import { FindUsersProviderQuery } from './queries/find-users-provider.query';
 import { FindProviderQuery } from './queries/find-provider.query';
 import { CreateUserCommand } from './commands/create-user.command';
-import { GetAllUsersQuery } from './queries/get-all-users.query';
+import { User } from '../domain/user';
+import { CreateUsersProviderCommand } from './commands/create-users-provider.command';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let mockUserFactory: jest.Mocked<UserFactory>;
   let mockCommandBus: jest.Mocked<CommandBus>;
   let mockQueryBus: jest.Mocked<QueryBus>;
+  let mockJwtService: jest.Mocked<JwtService>;
+  let mockAuthClient: jest.Mocked<ClientProxy>;
+  let mockUserFactory: jest.Mocked<UserFactory>;
+  let mockUsersProviderFactory: jest.Mocked<UsersProviderFactory>;
+  let mockEmailNotifierService: jest.Mocked<EmailNotifierService>;
+  let mockConfig: TAppConfig;
 
   beforeEach(async () => {
-    const mockConfig = createMockAppConfig();
+    mockConfig = {
+      ...appConfig(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        {
-          provide: appConfig.KEY,
-          useValue: mockConfig,
-        },
-        {
-          provide: UserFactory,
-          useFactory: () => ({
-            create: jest.fn(),
-          }),
-        },
         {
           provide: CommandBus,
           useFactory: () => ({
@@ -52,73 +54,74 @@ describe('UsersService', () => {
             execute: jest.fn(),
           }),
         },
+        {
+          provide: JwtService,
+          useFactory: () => ({
+            sign: jest.fn(),
+            verify: jest.fn(),
+          }),
+        },
+        {
+          provide: appConfig.KEY,
+          useValue: mockConfig,
+        },
+        {
+          provide: mockConfig.AUTH_MICROSERVICE_NAME,
+          useFactory: () => ({
+            send: jest.fn(),
+          }),
+        },
+        {
+          provide: UserFactory,
+          useFactory: () => ({
+            create: jest.fn(),
+          }),
+        },
+        {
+          provide: UsersProviderFactory,
+          useFactory: () => ({
+            create: jest.fn(),
+            hashPassword: jest.fn(),
+          }),
+        },
+        {
+          provide: EmailNotifierService,
+          useFactory: () => ({
+            sendMail: jest.fn().mockResolvedValue(undefined),
+          }),
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    mockUserFactory = module.get(UserFactory) as jest.Mocked<UserFactory>;
     mockCommandBus = module.get(CommandBus) as jest.Mocked<CommandBus>;
     mockQueryBus = module.get(QueryBus) as jest.Mocked<QueryBus>;
-  });
-
-  describe('findAll', () => {
-    it('should return all users', async () => {
-      const mockUsers: IUser[] = [
-        {
-          [EDbEntityFields.id]: '1',
-          [EUserFields.providers]: [
-            {
-              [EDbEntityFields.id]: '1',
-              [EUsersProviderFields.userLocalId]: '1',
-              [EUsersProviderFields.providerLocalId]: '1',
-              [EUsersProviderFields.sub]: 'SUB',
-              [EUsersProviderFields.email]: 'test@example.com',
-              [EUsersProviderFields.login]: 'testuser',
-              [EUsersProviderFields.name]: 'Test',
-              [EUsersProviderFields.surname]: 'User',
-              [EUsersProviderFields.password]: 'hashedpassword',
-              [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
-              [EUsersProviderFields.emailIsValidated]: false,
-              [EDbEntityFields.createdAt]: new Date(),
-              [EDbEntityFields.updatedAt]: new Date(),
-            },
-          ],
-          [EDbEntityFields.createdAt]: new Date(),
-          [EDbEntityFields.updatedAt]: new Date(),
-        },
-      ];
-
-      mockQueryBus.execute.mockResolvedValue(mockUsers);
-
-      const result = await service.findAll();
-
-      expect(result).toEqual(mockUsers);
-      expect(mockQueryBus.execute).toHaveBeenCalledWith(
-        expect.any(GetAllUsersQuery),
-      );
-    });
-
-    it('should throw Error when query bus throws an error', async () => {
-      const errorMessage = 'Database error';
-      mockQueryBus.execute.mockRejectedValue(new Error(errorMessage));
-
-      await expect(service.findAll()).rejects.toThrow(errorMessage);
-    });
+    mockJwtService = module.get(JwtService) as jest.Mocked<JwtService>;
+    mockAuthClient = module.get(
+      mockConfig.AUTH_MICROSERVICE_NAME,
+    ) as jest.Mocked<ClientProxy>;
+    mockUserFactory = module.get(UserFactory) as jest.Mocked<UserFactory>;
+    mockUsersProviderFactory = module.get(
+      UsersProviderFactory,
+    ) as jest.Mocked<UsersProviderFactory>;
+    mockEmailNotifierService = module.get(
+      EmailNotifierService,
+    ) as jest.Mocked<EmailNotifierService>;
   });
 
   describe('create', () => {
     it('should create a new local user when no existing user is found', async () => {
-      const createUsersProviderCommand = new CreateUsersProviderCommand(
-        EProvider.local,
-        'SUB',
-        'test@example.com',
-        'testuser',
-        'Test',
-        'User',
-        'password123',
-        'https://example.com/avatar.jpg',
-        false,
-      );
+      const createUsersProviderCommand = {
+        [EUsersProviderFields.providerName]: EProvider.local,
+        [EUsersProviderFields.sub]: 'SUB',
+        [EUsersProviderFields.email]: 'test@example.com',
+        [EUsersProviderFields.login]: 'testuser',
+        [EUsersProviderFields.name]: 'Test',
+        [EUsersProviderFields.surname]: 'User',
+        [EUsersProviderFields.password]: 'password123',
+        [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
+        [EUsersProviderFields.emailIsValidated]: false,
+      };
 
       const mockUser = {
         [EDbEntityFields.id]: '1',
@@ -142,10 +145,13 @@ describe('UsersService', () => {
         return undefined;
       });
 
-      mockUserFactory.create.mockReturnValue(mockUser);
+      mockUserFactory.create.mockResolvedValue(mockUser);
       mockCommandBus.execute.mockResolvedValue(mockCreatedUser);
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
 
-      const result = await service.create(createUsersProviderCommand);
+      const result = await service.create(
+        createUsersProviderCommand as CreateUsersProviderCommand,
+      );
 
       expect(result).toEqual(mockCreatedUser);
       expect(mockUserFactory.create).toHaveBeenCalledWith(
@@ -159,6 +165,67 @@ describe('UsersService', () => {
       expect(mockCommandBus.execute).toHaveBeenCalledWith(
         expect.any(CreateUserCommand),
       );
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('should send reset password email', async () => {
+      const dto: ForgotUsersProviderPasswordDto = {
+        [EUsersProviderFields.emailOrLogin]: 'test@example.com',
+        [EUsersProviderFields.recaptchaToken]: 'recaptcha-token',
+      };
+
+      const mockUser = {
+        [EDbEntityFields.id]: 'userId',
+        [EUsersProviderFields.email]: 'test@example.com',
+      };
+
+      mockCommandBus.execute.mockResolvedValue(mockUser);
+      mockJwtService.sign.mockReturnValue('reset-token');
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
+
+      await service.forgotPassword(dto);
+
+      expect(mockCommandBus.execute).toHaveBeenCalled();
+      expect(mockJwtService.sign).toHaveBeenCalled();
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should reset user password', async () => {
+      const dto: ResetUsersProviderPasswordDto = {
+        [EUsersProviderFields.password]: 'newPassword123!',
+        [EUsersProviderFields.repeatPassword]: 'newPassword123!',
+        [EUsersParams.token]: 'valid-token',
+        [EUsersProviderFields.recaptchaToken]: 'recaptcha-token',
+      };
+
+      const mockDecodedToken = { [EDbEntityFields.id]: 'userId' };
+      mockJwtService.verify.mockReturnValue(mockDecodedToken);
+
+      const mockUser = {
+        [EDbEntityFields.id]: 'userId',
+        [EUsersProviderFields.userLocalId]: 'userLocalId',
+        [EUsersProviderFields.email]: 'test@example.com',
+        [EUsersProviderFields.providerName]: EProvider.local,
+      };
+
+      mockQueryBus.execute.mockResolvedValue(mockUser);
+      mockUsersProviderFactory.hashPassword.mockResolvedValue('hashedPassword');
+      mockCommandBus.execute.mockResolvedValue(undefined);
+      mockAuthClient.send.mockReturnValue(of(undefined));
+      mockEmailNotifierService.sendMail.mockResolvedValue(undefined);
+
+      await service.resetPassword(dto);
+
+      expect(mockJwtService.verify).toHaveBeenCalled();
+      expect(mockQueryBus.execute).toHaveBeenCalled();
+      expect(mockUsersProviderFactory.hashPassword).toHaveBeenCalled();
+      expect(mockCommandBus.execute).toHaveBeenCalled();
+      expect(mockAuthClient.send).toHaveBeenCalled();
+      expect(mockEmailNotifierService.sendMail).toHaveBeenCalled();
     });
   });
 });

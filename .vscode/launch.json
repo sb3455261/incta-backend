@@ -54,6 +54,31 @@
       {
         "type": "node",
         "request": "launch",
+        "name": "Debug Auth",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": [
+          "run",
+          "dev:auth"
+        ],
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "outFiles": [
+          "${workspaceFolder}/dist/**/*.js"
+        ],
+        "sourceMaps": true,
+        "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ],
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/.env",
+        "cwd": "${workspaceFolder}",
+        "restart": true
+      },
+      {
+        "type": "node",
+        "request": "launch",
         "name": "Debug Users",
         "runtimeExecutable": "npm",
         "runtimeArgs": [

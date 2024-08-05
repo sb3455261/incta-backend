@@ -1,15 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { appConfig as _appConfig } from '@app/shared';
+import * as cookieParser from 'cookie-parser';
 import { GatewayModule } from './gateway.module';
+import { swagger } from './swagger';
 
 (async function bootstrap() {
-  const appConfig = _appConfig();
+  const config = _appConfig();
   const gatewayApp = await NestFactory.create(GatewayModule);
-  gatewayApp.setGlobalPrefix(appConfig.APP_API_PREFIX);
-  await gatewayApp.listen(appConfig.GATEWAY_MICROSERVICE_PORT).then(() => {
+  gatewayApp.use(cookieParser());
+  gatewayApp.setGlobalPrefix(config.APP_API_PREFIX);
+  swagger(gatewayApp);
+  await gatewayApp.listen(config.GATEWAY_MICROSERVICE_PORT).then(() => {
     console.debug(
       `
-        Gateway microservice is running on port ${appConfig.GATEWAY_MICROSERVICE_PORT}
+        Gateway microservice is running on port ${config.GATEWAY_MICROSERVICE_PORT}
       `,
     );
   });
