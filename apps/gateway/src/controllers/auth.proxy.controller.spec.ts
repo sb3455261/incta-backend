@@ -45,7 +45,7 @@ describe('AuthProxyController', () => {
 
   describe('localSignup', () => {
     it('should call authClient.send with correct parameters and return success response', async () => {
-      const signupDto: Partial<UsersProviderDto> = {
+      const signupDto: UsersProviderDto = {
         [EUsersProviderFields.providerName]: EProvider.local,
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
@@ -56,15 +56,14 @@ describe('AuthProxyController', () => {
         [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
+        [EUsersProviderFields.sub]: 'sub123',
       };
 
       jest
         .spyOn(authClient, 'send')
         .mockReturnValue(of({ [EAuthParams.accessToken]: 'token' }));
 
-      const result = await controller.localSignup(
-        signupDto as Required<typeof signupDto>,
-      );
+      const result = await controller.localSignup(signupDto);
 
       expect(authClient.send).toHaveBeenCalledWith(
         { cmd: `${EAuthRoutes.local}/${EAuthRoutes.signup}` },
@@ -77,7 +76,7 @@ describe('AuthProxyController', () => {
     });
 
     it('should return failure response when signup fails', async () => {
-      const signupDto: Partial<UsersProviderDto> = {
+      const signupDto: UsersProviderDto = {
         [EUsersProviderFields.providerName]: EProvider.local,
         [EUsersProviderFields.email]: 'test@example.com',
         [EUsersProviderFields.login]: 'testuser',
@@ -88,13 +87,12 @@ describe('AuthProxyController', () => {
         [EUsersProviderFields.agreement]: 'agreed',
         [EUsersProviderFields.avatar]: 'https://example.com/avatar.jpg',
         [EUsersProviderFields.emailIsValidated]: false,
+        [EUsersProviderFields.sub]: 'sub123',
       };
 
       jest.spyOn(authClient, 'send').mockReturnValue(of({}));
 
-      const result = await controller.localSignup(
-        signupDto as Required<typeof signupDto>,
-      );
+      const result = await controller.localSignup(signupDto);
 
       expect(result).toEqual({
         success: false,
@@ -130,7 +128,12 @@ describe('AuthProxyController', () => {
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         EAuthParams.accessToken,
         'token',
-        expect.any(Object),
+        expect.objectContaining({
+          domain: '.localhost',
+          httpOnly: true,
+          path: '/',
+          secure: false,
+        }),
       );
       expect(result).toEqual({
         success: true,
@@ -140,47 +143,206 @@ describe('AuthProxyController', () => {
   });
 
   describe('externalSignin', () => {
-    it('should call authClient.send with correct parameters and redirect on success', async () => {
+    it('should redirect to Google signin when provider is Google', async () => {
       const provider = EProvider.google;
       const agreement = '1';
       const mockResponse = {
         redirect: jest.fn(),
+      };
+
+      await controller.externalSignin(provider, agreement, mockResponse as any);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        `./${EAuthRoutes.signin}/${EProvider.google}`,
+      );
+    });
+
+    it('should redirect to GitHub signin when provider is GitHub', async () => {
+      const provider = EProvider.github;
+      const agreement = '1';
+      const mockResponse = {
+        redirect: jest.fn(),
+      };
+
+      await controller.externalSignin(provider, agreement, mockResponse as any);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        `./${EAuthRoutes.signin}/${EProvider.github}`,
+      );
+    });
+
+    it('should redirect with error status when agreement is missing', async () => {
+      const provider = EProvider.google;
+      const agreement = '';
+      const mockResponse = {
+        redirect: jest.fn(),
+      };
+
+      await controller.externalSignin(provider, agreement, mockResponse as any);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        400,
+        mockConfig.USERS_LOGIN_PAGE_URL,
+      );
+    });
+
+    it('should redirect with error status for unsupported provider', async () => {
+      const provider = 'unsupported' as EProvider;
+      const agreement = '1';
+      const mockResponse = {
+        redirect: jest.fn(),
+      };
+
+      await controller.externalSignin(provider, agreement, mockResponse as any);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        400,
+        mockConfig.USERS_LOGIN_PAGE_URL,
+      );
+    });
+  });
+
+  describe('googleCallback', () => {
+    it('should handle Google callback and set cookie on success', async () => {
+      const mockRequest = {
+        user: {
+          accessToken: 'mockAccessToken',
+          refreshToken: 'mockRefreshToken',
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.name]: 'Test',
+          [EUsersProviderFields.surname]: 'User',
+          [EUsersProviderFields.sub]: 'sub123',
+          [EUsersProviderFields.providerName]: EProvider.google,
+        },
+      };
+      const mockResponse = {
         cookie: jest.fn(),
+        redirect: jest.fn(),
       };
 
       jest
         .spyOn(authClient, 'send')
-        .mockReturnValue(of({ [EAuthParams.accessToken]: 'token' }));
+        .mockReturnValue(of({ [EAuthParams.accessToken]: 'newAccessToken' }));
 
-      await controller.externalSignin(provider, agreement, mockResponse as any);
+      await controller.googleCallback(mockRequest as any, mockResponse as any);
 
       expect(authClient.send).toHaveBeenCalledWith(
         { cmd: `${EAuthRoutes.external}/:${EAuthParams.provider}` },
-        { provider, agreement },
+        expect.objectContaining({
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.providerName]: EProvider.google,
+        }),
       );
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         EAuthParams.accessToken,
-        'token',
-        expect.any(Object),
+        'newAccessToken',
+        expect.objectContaining({
+          domain: '.localhost',
+          httpOnly: true,
+          path: '/',
+          secure: false,
+        }),
       );
       expect(mockResponse.redirect).toHaveBeenCalledWith(
         mockConfig.USERS_LOGIN_PAGE_URL,
       );
     });
 
-    it('should redirect with error status when external signin fails', async () => {
-      const provider = EProvider.google;
-      const agreement = '1';
+    it('should redirect with error status when callback fails', async () => {
+      const mockRequest = {
+        user: {
+          accessToken: 'mockAccessToken',
+          refreshToken: 'mockRefreshToken',
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.name]: 'Test',
+          [EUsersProviderFields.surname]: 'User',
+          [EUsersProviderFields.sub]: 'sub123',
+          [EUsersProviderFields.providerName]: EProvider.google,
+        },
+      };
       const mockResponse = {
         redirect: jest.fn(),
       };
 
       jest.spyOn(authClient, 'send').mockReturnValue(of({}));
 
-      await controller.externalSignin(provider, agreement, mockResponse as any);
+      await controller.googleCallback(mockRequest as any, mockResponse as any);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        400,
+        401,
+        mockConfig.USERS_LOGIN_PAGE_URL,
+      );
+    });
+  });
+
+  describe('githubCallback', () => {
+    it('should handle GitHub callback and set cookie on success', async () => {
+      const mockRequest = {
+        user: {
+          accessToken: 'mockAccessToken',
+          refreshToken: 'mockRefreshToken',
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.name]: 'Test',
+          [EUsersProviderFields.surname]: 'User',
+          [EUsersProviderFields.sub]: 'sub123',
+          [EUsersProviderFields.providerName]: EProvider.github,
+        },
+      };
+      const mockResponse = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+      };
+
+      jest
+        .spyOn(authClient, 'send')
+        .mockReturnValue(of({ [EAuthParams.accessToken]: 'newAccessToken' }));
+
+      await controller.githubCallback(mockRequest as any, mockResponse as any);
+
+      expect(authClient.send).toHaveBeenCalledWith(
+        { cmd: `${EAuthRoutes.external}/:${EAuthParams.provider}` },
+        expect.objectContaining({
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.providerName]: EProvider.github,
+        }),
+      );
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        EAuthParams.accessToken,
+        'newAccessToken',
+        expect.objectContaining({
+          domain: '.localhost',
+          httpOnly: true,
+          path: '/',
+          secure: false,
+        }),
+      );
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        mockConfig.USERS_LOGIN_PAGE_URL,
+      );
+    });
+
+    it('should redirect with error status when callback fails', async () => {
+      const mockRequest = {
+        user: {
+          accessToken: 'mockAccessToken',
+          refreshToken: 'mockRefreshToken',
+          [EUsersProviderFields.email]: 'test@example.com',
+          [EUsersProviderFields.name]: 'Test',
+          [EUsersProviderFields.surname]: 'User',
+          [EUsersProviderFields.sub]: 'sub123',
+          [EUsersProviderFields.providerName]: EProvider.github,
+        },
+      };
+      const mockResponse = {
+        redirect: jest.fn(),
+      };
+
+      jest.spyOn(authClient, 'send').mockReturnValue(of({}));
+
+      await controller.githubCallback(mockRequest as any, mockResponse as any);
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        401,
         mockConfig.USERS_LOGIN_PAGE_URL,
       );
     });
@@ -245,7 +407,10 @@ describe('AuthProxyController', () => {
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         EAuthParams.accessToken,
         'newToken',
-        expect.any(Object),
+        expect.objectContaining({
+          httpOnly: true,
+          secure: false,
+        }),
       );
       expect(result).toEqual({
         success: true,

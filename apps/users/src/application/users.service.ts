@@ -339,6 +339,10 @@ export class UsersService {
       await this.commandBus.execute(
         new ConfirmUsersLocalProviderEmailCommand(decoded[EDbEntityFields.id]),
       );
+      await this.sendEmailHasBeenVerified(
+        usersProvider[EUsersProviderFields.email],
+      );
+
       return true;
     } catch (error) {
       return false;
@@ -377,16 +381,34 @@ export class UsersService {
   ): Promise<void> {
     const verificationToken =
       this.generateEmailVerificationToken(usersProviderId);
-    const url = `https://${EGatewayRoutes.gateway}.incta.team/${this.appConfig.APP_API_PREFIX}/${EUsersRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/${verificationToken}`;
+    const basePath =
+      this.appConfig.NODE_ENV === 'production'
+        ? `https://${EGatewayRoutes.gateway}.${this.appConfig.APP_MAIN_DOMAIN}`
+        : `http://localhost:${this.appConfig.GATEWAY_MICROSERVICE_PORT}`;
+    const url = `${basePath}/${this.appConfig.APP_API_PREFIX}/${EUsersRoutes.users}/${EUsersRoutes.verifyEmailVerificationToken}/${verificationToken}`;
     const message = `
         <div>Please follow this link to verify your email address</div>
         <div>
             <a href="${url}" target="_blank">Verify email</a>
         </div>
         <div>Current time is: ${Date.now()}</div>
-        <div>The link validity expires at ${Date.now() + this.appConfig.USERS_EMAIL_CONFIRMATION_TTL}</div>
+        <div>The link expires at ${Date.now() + this.appConfig.USERS_EMAIL_CONFIRMATION_TTL}</div>
     `;
     await this.addEMailToQueue(email, message, 'verify your email');
+  }
+
+  private async sendEmailHasBeenVerified(email: string): Promise<void> {
+    const message = `
+        <div>Hi there, you have successfully verified your email and signed up</div>
+    `;
+    await this.addEMailToQueue(email, message, 'success');
+  }
+
+  private async sendExternalSignUpSuccess(email: string): Promise<void> {
+    const message = `
+        <div>Hi there, you have successfully signed up</div>
+    `;
+    await this.addEMailToQueue(email, message, 'success');
   }
 
   private async sendResetPasswordEmail(
@@ -401,14 +423,14 @@ export class UsersService {
             <a href="${url}" target="_blank">Reset password</a>
         </div>
         <div>Current time is: ${Date.now()}</div>
-        <div>Please copmplet your password recovery before: ${Date.now() + this.appConfig.USERS_PASSWORD_RESET_TOKEN_TTL / 1000} </div>
+        <div>Please copmplete your password recovery before: ${Date.now() + this.appConfig.USERS_PASSWORD_RESET_TOKEN_TTL / 1000} </div>
     `;
     await this.addEMailToQueue(email, message, 'reset your password');
   }
 
   private async sendPasswordWasChangedEmail(email: string): Promise<void> {
     const message = `
-        <div>Your password was succesfully changed.</div>
+        <div>Your password has been succesfully changed.</div>
     `;
     await this.addEMailToQueue(email, message, 'password changed');
   }
@@ -503,11 +525,11 @@ export class UsersService {
     newUsersProvider: IUsersProvider,
     existingWithEmailUsersProvider: IUsersProvider,
   ): Promise<Omit<IUser, EUserFields.providers>> {
-    // non-local
+    // external
     // email+provider && will update
     // sub+provider && will update
     // sub || provider email <- does not exist <- will add to existing
-    // non-local does not exist -> will add
+    // external does not exist -> will add
 
     const existingWithEmailAndProviderUsersProvider =
       await this.queryBus.execute(
@@ -579,6 +601,11 @@ export class UsersService {
     }
 
     // external does not exist -> will add
-    return this.commandBus.execute(new CreateUserCommand(user));
+    const result = await this.commandBus.execute(new CreateUserCommand(user));
+    await this.sendExternalSignUpSuccess(
+      newUsersProvider[EUsersProviderFields.email],
+    );
+
+    return result;
   }
 }

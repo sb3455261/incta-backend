@@ -40,22 +40,9 @@ export class AuthController {
   }
 
   @MessagePattern({ cmd: `${EAuthRoutes.external}/:${EAuthParams.provider}` })
-  async externalSignin(
-    @Payload()
-    data: {
-      provider: EProvider;
-      [EUsersProviderFields.agreement]: string;
-    },
-  ) {
-    /* try {
-      return await this.authService.externalSignin(data.provider, data.agreement);
-    } catch (error) {
-      throw new RpcException(error);
-    } */
+  async externalSignin(@Payload() signupDto: UsersProviderDto) {
     try {
-      throw new NotImplementedException(
-        'External signin is not yet implemented',
-      );
+      return await this.authService.externalSignin(signupDto);
     } catch (error) {
       throw new RpcException(AppRpcErrorFormatter.format(error));
     }

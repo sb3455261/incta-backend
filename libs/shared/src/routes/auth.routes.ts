@@ -1,4 +1,6 @@
 export enum EAuthRoutes {
+  auth = 'auth',
+  callback = 'callback',
   signin = 'signin',
   signup = 'signup',
   local = 'local',
