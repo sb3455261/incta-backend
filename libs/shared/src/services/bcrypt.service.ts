@@ -13,7 +13,10 @@ export class BcryptService implements HashPasswordService {
     return hash(rawPassword, await genSalt());
   }
 
-  compare(rawPassword: string | Buffer, encrypted: string): Promise<boolean> {
+  async compare(
+    rawPassword: string | Buffer,
+    encrypted: string,
+  ): Promise<boolean> {
     return compare(rawPassword, encrypted);
   }
 }
