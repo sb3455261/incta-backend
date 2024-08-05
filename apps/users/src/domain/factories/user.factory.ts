@@ -13,7 +13,7 @@ export class UserFactory {
     id?: string,
   ): Promise<User> {
     console.debug('UserFactory 1');
-    return User.create(
+    const result = User.create(
       id,
       usersProvider[EUsersProviderFields.providerName] as EProvider,
       await this.usersProviderFactory.create(
@@ -22,5 +22,7 @@ export class UserFactory {
         usersProvider,
       ),
     );
+    console.debug('UserFactory 2');
+    return result;
   }
 }

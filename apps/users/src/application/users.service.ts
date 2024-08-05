@@ -74,19 +74,13 @@ export class UsersService {
       }),
     );
     console.debug('create users service 1');
-    const user = (await this.userFactory
-      .create(
-        usersProvider,
-        existingWithEmailUsersProvider?.[EUsersProviderFields.userLocalId],
-      )
-      .catch((error) => {
-        console.debug(error, 'create users service  error1');
-      })) as User;
-    const provider = await this.queryBus
-      .execute(new FindProviderQuery(user.getProviderName()))
-      .catch((error) => {
-        console.debug(error, 'create users service  error2');
-      });
+    const user = await this.userFactory.create(
+      usersProvider,
+      existingWithEmailUsersProvider?.[EUsersProviderFields.userLocalId],
+    );
+    const provider = await this.queryBus.execute(
+      new FindProviderQuery(user.getProviderName()),
+    );
     console.debug('create users service 2');
     user.setProviderLocalId(provider.id);
     const newUsersProvider = user.getUsersProvider();
