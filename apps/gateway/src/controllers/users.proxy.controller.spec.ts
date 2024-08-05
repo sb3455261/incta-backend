@@ -80,7 +80,7 @@ describe('UsersProxyController', () => {
         { token },
       );
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        401,
+        302,
         mockConfig.USERS_EMAIL_VERIFICATION_ERROR_PAGE_URL,
       );
     });
