@@ -12,8 +12,7 @@ export class UserFactory {
     usersProvider: CreateUsersProviderCommand,
     id?: string,
   ): Promise<User> {
-    console.debug('UserFactory 1');
-    const result = User.create(
+    return User.create(
       id,
       usersProvider[EUsersProviderFields.providerName] as EProvider,
       await this.usersProviderFactory.create(
@@ -22,7 +21,5 @@ export class UserFactory {
         usersProvider,
       ),
     );
-    console.debug('UserFactory 2');
-    return result;
   }
 }

@@ -13,12 +13,10 @@ export class BcryptService implements HashPasswordService {
   async hash(rawPassword: string | Buffer): Promise<string> {
     try {
         console.debug('BcryptService 1', rawPassword, 'rawPassword');
-        //const _hash = await hash(rawPassword, await genSalt());
-        const salt = bcrypt.genSaltSync(10);
-        const hash = bcrypt.hashSync(rawPassword, salt);
-        const hash2 = await bcrypt.hash(rawPassword, 10)
+        console.log(bcrypt, 'bcrypt')
+        const salt = await bcrypt.genSalt();
+        const hash = await bcrypt.hash(rawPassword, salt);
         console.debug('BcryptService 2', hash, '_hash');
-        console.debug('BcryptService 3', hash2, 'hash2');
         return hash
     } catch(error) {
         console.log(error)
