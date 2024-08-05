@@ -1,7 +1,11 @@
-## run "npm run format" before commiting
+## run "npm run format"
 
-##swagger:
+before commiting
+
+## swagger:
+
 https://gateway.incta.team/api/v1/api-doc
 
-##mail server
+## mail server
+
 http://80.211.200.56:8080
