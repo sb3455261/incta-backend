@@ -10,16 +10,11 @@ export abstract class HashPasswordService {
 @Injectable()
 export class BcryptService implements HashPasswordService {
   async hash(rawPassword: string | Buffer): Promise<string> {
-    try {
-        console.debug('hash 1')
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = crypto.pbkdf2Sync(rawPassword, salt, 1000, 64, 'sha512').toString('hex');
-        console.debug('hash 2', `${salt}:${hash}`)
-        return `${salt}:${hash}`;
-    } catch(error) {
-        console.debug(error, 'error')
-        return 'HASH'
-    }
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto
+      .pbkdf2Sync(rawPassword, salt, 1000, 64, 'sha512')
+      .toString('hex');
+    return `${salt}:${hash}`;
   }
 
   async compare(
@@ -27,7 +22,9 @@ export class BcryptService implements HashPasswordService {
     encrypted: string,
   ): Promise<boolean> {
     const [salt, storedHash] = encrypted.split(':');
-    const suppliedHash = crypto.pbkdf2Sync(rawPassword, salt, 1000, 64, 'sha512').toString('hex');
+    const suppliedHash = crypto
+      .pbkdf2Sync(rawPassword, salt, 1000, 64, 'sha512')
+      .toString('hex');
     return storedHash === suppliedHash;
   }
 }
