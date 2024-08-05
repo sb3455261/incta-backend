@@ -54,8 +54,14 @@ export class AuthService {
     return this.generateLocalAuthResponse(user, EProvider.local);
   }
 
-  async externalSignin(provider: EProvider, agreement: string): Promise<any> {
-    throw new Error('External signin not implemented');
+  async externalSignin(signupDto: UsersProviderDto): Promise<any> {
+    const externalUser = await firstValueFrom(
+      this.usersClient.send({ cmd: EUsersRoutes.createUser }, signupDto),
+    );
+    return this.generateLocalAuthResponse(
+      externalUser,
+      signupDto[EUsersProviderFields.providerName],
+    );
   }
 
   async validateUser(emailOrLogin: string, password: string): Promise<any> {

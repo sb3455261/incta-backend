@@ -41,6 +41,7 @@ import {
 import { SuccessResponseDto } from '@app/shared/dto/responses.dto';
 import { ErrorResponseDto } from '@app/shared/dto/error.dto';
 import { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
+import { AuthGuard as NestAuthGuard } from '@nestjs/passport';
 import { AuthGuard } from '../guards/auth.guard';
 import { GatwayErrorInterceptor } from '../interceptors/gateway-errors.interceptor';
 import { NonAuthGuard } from '../guards/non-auth.guard';
@@ -141,12 +142,10 @@ export class AuthProxyController {
   @ApiConsumes('application/x-www-form-urlencoded')
   @ApiResponse({
     status: 302,
-    description: Messages.SUCCESS_LOGIN,
   })
   @ApiResponse({
     status: 400,
     description: Messages.ERROR_BAD_REQUEST,
-    type: ErrorResponseDto,
   })
   @ApiParam({
     required: true,
@@ -166,14 +165,33 @@ export class AuthProxyController {
   @UseGuards(NonAuthGuard)
   @Get(`${EAuthRoutes.external}/:${EAuthParams.provider}`)
   async externalSignin(
-    @Param(EAuthParams.provider) provider: string,
+    @Param(EAuthParams.provider) provider: EProvider,
     @Query(EUsersProviderFields.agreement) agreement: string,
     @Res({ passthrough: true }) response: Response,
   ) {
+    if (!agreement) {
+      return response.redirect(400, this.config.USERS_LOGIN_PAGE_URL);
+    }
+    if (provider === EProvider.google) {
+      return response.redirect(`./${EAuthRoutes.signin}/${EProvider.google}`);
+    }
+    return response.redirect(400, this.config.USERS_LOGIN_PAGE_URL);
+  }
+
+  @Get(`/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}`)
+  @UseGuards(NestAuthGuard(EProvider.google))
+  async googleAuth(@Req() request: Request) {}
+
+  @Get(
+    `/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`,
+  )
+  @UseGuards(NestAuthGuard(EProvider.google))
+  async googleCallback(@Req() request: Request, @Res() response: Response) {
+    const { accessToken, refreshToken, ...usersProvider } = request.user as any;
     const result = await lastValueFrom(
       this.authClient.send(
         { cmd: `${EAuthRoutes.external}/:${EAuthParams.provider}` },
-        { provider, agreement },
+        usersProvider,
       ),
     );
     if (result[EAuthParams.accessToken]) {
@@ -181,8 +199,9 @@ export class AuthProxyController {
         EAuthParams.accessToken,
         result[EAuthParams.accessToken],
         {
+          domain: `.${this.config.APP_MAIN_DOMAIN}`,
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: this.config.NODE_ENV === 'production',
         },
       );
       return response.redirect(this.config.USERS_LOGIN_PAGE_URL);

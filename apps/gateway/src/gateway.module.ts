@@ -4,6 +4,7 @@ import { appConfig, AppConfigModule, TAppConfig } from '@app/shared';
 import { ConfigModule } from '@nestjs/config';
 import { UsersProxyController } from './controllers/users.proxy.controller';
 import { AuthProxyController } from './controllers/auth.proxy.controller';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 const config = appConfig();
 
@@ -40,5 +41,6 @@ const config = appConfig();
     ]),
   ],
   controllers: [UsersProxyController, AuthProxyController],
+  providers: [GoogleStrategy],
 })
 export class GatewayModule {}
