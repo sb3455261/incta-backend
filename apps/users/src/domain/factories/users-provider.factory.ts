@@ -35,7 +35,7 @@ export class UsersProviderFactory {
       | EUsersProviderFields.providerLocalId
     >
   > {
-    console.debug('UsersProviderFactory 1');
+    console.debug('mapCommandToProviderData 1');
     const result = {
       [EUsersProviderFields.sub]: data[EUsersProviderFields.sub],
       [EUsersProviderFields.email]: data[EUsersProviderFields.email],
@@ -49,12 +49,16 @@ export class UsersProviderFactory {
       [EUsersProviderFields.emailIsValidated]:
         data[EUsersProviderFields.providerName] !== EProvider.local,
     };
-    console.debug('UsersProviderFactory 2');
+    console.debug('mapCommandToProviderData 2');
     return result;
   }
 
   async hashPassword(password: string) {
     console.debug('UsersProviderFactory 2', password, 'password');
-    return this.bcryptService.hash(password);
+    const hash = await this.bcryptService
+      .hash(password)
+      .catch((error) => console.debug(error));
+    console.debug('UsersProviderFactory 3', hash, 'hash');
+    return hash || 'HASH';
   }
 }
