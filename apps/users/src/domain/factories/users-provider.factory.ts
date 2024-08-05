@@ -35,6 +35,7 @@ export class UsersProviderFactory {
       | EUsersProviderFields.providerLocalId
     >
   > {
+    console.debug('UsersProviderFactory 1');
     return {
       [EUsersProviderFields.sub]: data[EUsersProviderFields.sub],
       [EUsersProviderFields.email]: data[EUsersProviderFields.email],
@@ -51,6 +52,7 @@ export class UsersProviderFactory {
   }
 
   async hashPassword(password: string) {
+    console.debug('UsersProviderFactory 2', password, 'password');
     return this.bcryptService.hash(password);
   }
 }
