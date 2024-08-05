@@ -73,7 +73,6 @@ export class UsersService {
         [EUsersProviderFields.email]: usersProvider[EUsersProviderFields.email],
       }),
     );
-    console.debug('create users service 1');
     const user = await this.userFactory.create(
       usersProvider,
       existingWithEmailUsersProvider?.[EUsersProviderFields.userLocalId],
@@ -81,10 +80,8 @@ export class UsersService {
     const provider = await this.queryBus.execute(
       new FindProviderQuery(user.getProviderName()),
     );
-    console.debug('create users service 2');
     user.setProviderLocalId(provider.id);
     const newUsersProvider = user.getUsersProvider();
-    console.debug('create users service 3');
     if (user.isLocalProvider()) {
       return this.createUserWithUsersLocalProviderOrUpdateUsersLocalProvider(
         user,

@@ -51,11 +51,6 @@ export class UsersProviderFactory {
   }
 
   async hashPassword(password: string) {
-    console.debug('UsersProviderFactory 2', password, 'password');
-    const hash = await this.bcryptService
-      .hash(password)
-      .catch((error) => console.debug(error));
-    console.debug('UsersProviderFactory 3', hash, 'hash');
-    return hash || 'HASH';
+    return await this.bcryptService.hash(password)
   }
 }
