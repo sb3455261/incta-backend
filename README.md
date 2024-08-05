@@ -4,7 +4,7 @@ before commiting
 
 ## swagger:
 
-https://gateway.incta.team/api/v1/api-doc
+https://gateway.incta.team/api/v1/api-docs
 
 ## mail server
 
