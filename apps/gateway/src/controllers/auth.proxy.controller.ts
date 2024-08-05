@@ -32,6 +32,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCookieAuth,
+  ApiExcludeEndpoint,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -126,11 +127,7 @@ export class AuthProxyController {
       response.cookie(
         EAuthParams.accessToken,
         result[EAuthParams.accessToken],
-        {
-          domain: `.${this.config.APP_MAIN_DOMAIN}`,
-          httpOnly: true,
-          secure: this.config.NODE_ENV === 'production',
-        },
+        await this.getCookiesParameters(),
       );
     }
 
@@ -175,18 +172,45 @@ export class AuthProxyController {
     if (provider === EProvider.google) {
       return response.redirect(`./${EAuthRoutes.signin}/${EProvider.google}`);
     }
+    if (provider === EProvider.github) {
+      return response.redirect(`./${EAuthRoutes.signin}/${EProvider.github}`);
+    }
     return response.redirect(400, this.config.USERS_LOGIN_PAGE_URL);
   }
 
+  @ApiExcludeEndpoint()
   @Get(`/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}`)
   @UseGuards(NestAuthGuard(EProvider.google))
   async googleAuth(@Req() request: Request) {}
 
+  @ApiExcludeEndpoint()
   @Get(
     `/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`,
   )
   @UseGuards(NestAuthGuard(EProvider.google))
   async googleCallback(@Req() request: Request, @Res() response: Response) {
+    return this.handleExternalCallback(request, response, EProvider.google);
+  }
+
+  @ApiExcludeEndpoint()
+  @Get(`/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}`)
+  @UseGuards(NestAuthGuard(EProvider.github))
+  async githubAuth(@Req() request: Request) {}
+
+  @ApiExcludeEndpoint()
+  @Get(
+    `/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`,
+  )
+  @UseGuards(NestAuthGuard(EProvider.github))
+  async githubCallback(@Req() request: Request, @Res() response: Response) {
+    return this.handleExternalCallback(request, response, EProvider.github);
+  }
+
+  private async handleExternalCallback(
+    request: Request,
+    response: Response,
+    provider: EProvider,
+  ) {
     const { accessToken, refreshToken, ...usersProvider } = request.user as any;
     const result = await lastValueFrom(
       this.authClient.send(
@@ -198,15 +222,23 @@ export class AuthProxyController {
       response.cookie(
         EAuthParams.accessToken,
         result[EAuthParams.accessToken],
-        {
-          domain: `.${this.config.APP_MAIN_DOMAIN}`,
-          httpOnly: true,
-          secure: this.config.NODE_ENV === 'production',
-        },
+        await this.getCookiesParameters(),
       );
       return response.redirect(this.config.USERS_LOGIN_PAGE_URL);
     }
-    return response.redirect(400, this.config.USERS_LOGIN_PAGE_URL);
+    return response.redirect(401, this.config.USERS_LOGIN_PAGE_URL);
+  }
+
+  private async getCookiesParameters() {
+    return {
+      domain:
+        this.config.NODE_ENV === 'production'
+          ? `.${this.config.APP_MAIN_DOMAIN}`
+          : `.localhost`,
+      path: '/',
+      httpOnly: true,
+      secure: this.config.NODE_ENV === 'production',
+    };
   }
 
   @ApiOperation({ summary: Messages.DESC_LOGOUT })
@@ -267,7 +299,7 @@ export class AuthProxyController {
       response.cookie(
         EAuthParams.accessToken,
         result[EAuthParams.accessToken],
-        { httpOnly: true, secure: false },
+        await this.getCookiesParameters(),
       );
     }
 
