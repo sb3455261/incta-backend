@@ -51,6 +51,6 @@ export class UsersProviderFactory {
   }
 
   async hashPassword(password: string) {
-    return await this.bcryptService.hash(password)
+    return this.bcryptService.hash(password);
   }
 }
