@@ -4,6 +4,7 @@ import * as Joi from 'joi';
 import * as dotenv from 'dotenv';
 import { EAuthRoutes } from '../routes/auth.routes';
 import { EProvider } from '../types/user/user.type';
+import {EGatewayRoutes} from '../routes/gateway.routes'
 
 dotenv.config({ path: './.env' });
 
@@ -41,12 +42,12 @@ export const appConfig = registerAs(APP_CONFIG_NAME, () => {
     AUTH_SESSION_INACTIVITY_PERIOD: +process.env.AUTH_SESSION_INACTIVITY_PERIOD,
     AUTH_GOOGLE_CALLBACK_URL: isDevelopment
       ? `http://localhost:${+process.env.GATEWAY_MICROSERVICE_PORT}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`
-      : `https://${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`,
+      : `https://${EGatewayRoutes.gateway}.${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.google}/${EAuthRoutes.callback}`,
     AUTH_GOOGLE_CLIENT_ID: process.env.AUTH_GOOGLE_CLIENT_ID,
     AUTH_GOOGLE_CLIENT_SECRET: process.env.AUTH_GOOGLE_CLIENT_SECRET,
     AUTH_GITHUB_CALLBACK_URL: isDevelopment
       ? `http://localhost:${+process.env.GATEWAY_MICROSERVICE_PORT}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`
-      : `https://${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`,
+      : `https://${EGatewayRoutes.gateway}.${process.env.APP_MAIN_DOMAIN}/${process.env.APP_API_PREFIX}/${EAuthRoutes.auth}/${EAuthRoutes.external}/${EAuthRoutes.signin}/${EProvider.github}/${EAuthRoutes.callback}`,
     AUTH_GITHUB_CLIENT_ID: process.env.AUTH_GITHUB_CLIENT_ID,
     AUTH_GITHUB_CLIENT_SECRET: process.env.AUTH_GITHUB_CLIENT_SECRET,
 
